@@ -1,0 +1,191 @@
+{{define "settings"}}{{template "head" .}}
+{{if .DefPW}}<div class="msg alert">Es gilt noch das Standard-Passwort <b>admin/admin</b> – bitte unten ändern.</div>{{end}}
+{{with .St.LastError}}<div class="msg alert">Letzter Fehler: <code>{{.}}</code></div>{{end}}
+{{template "status" .}}
+
+<div class="card"><h2>System</h2>
+<div class="row"><span>Laufzeit</span><span>{{.Sys.Uptime}} (Dienst {{.Sys.DaemonUptime}})</span></div>
+<div class="row"><span>Speicher frei</span><span>{{.Sys.MemAvail}} von {{.Sys.MemTotal}} kB</span></div>
+<div class="row"><span>Flash frei</span><span>{{.Sys.DiskFree}}</span></div>
+<div class="row"><span>Seriennummer</span><span><code>{{.Serial}}</code></span></div>
+<div class="row"><span>LEDs</span><span class="mut">{{range .Sys.LEDs}}{{if .}}{{.}} {{end}}{{else}}keine gefunden{{end}}</span></div>
+<form method="post" action="/settings/reboot" onsubmit="return confirm('Stick neu starten?')"><button class="sec">Neu starten</button></form>
+</div>
+
+<div class="card"><h2>Internet-Zugang &amp; Uplink</h2>
+<form method="post" action="/settings/sys">
+<label>Systemname</label><input type="text" name="systemname" value="{{.Cfg.SystemName}}" maxlength="40">
+<label>Uplink</label><select name="uplink">
+<option value="auto" {{if eq .Cfg.Uplink "auto"}}selected{{end}}>Automatisch – WLAN bevorzugt, LTE als Rückfall</option>
+<option value="wlan" {{if eq .Cfg.Uplink "wlan"}}selected{{end}}>Nur WLAN</option>
+<option value="lte" {{if eq .Cfg.Uplink "lte"}}selected{{end}}>Nur LTE</option></select>
+<label class="chk"><input type="checkbox" name="captive_auto" {{if .Cfg.CaptiveAuto}}checked{{end}}> Captive-Portal automatisch (gesperrt, solange kein Uplink)</label>
+<label class="chk"><input type="checkbox" name="isolate" {{if .Cfg.Isolate}}checked{{end}}> PC vom lokalen Netz am Uplink trennen (nur Internet/Tunnel)</label>
+<label>Config-Server (Basis-URL, Datei: &lt;URL&gt;/{{.Serial}}/config.json)</label><input type="text" name="server" value="{{.Cfg.Server}}" placeholder="https://…">
+<label>Konfig-Secret (20 Zeichen, leer = unverändert{{if .Cfg.Secret}}, gesetzt{{end}})</label><input type="password" name="secret" maxlength="20" autocomplete="off">
+<button>Speichern</button></form>
+{{if not .Cfg.CaptiveAuto}}<form method="post" action="/settings/lock" class="inline">
+{{if .Cfg.Unlocked}}<input type="hidden" name="state" value="lock"><button class="sec">Internet sperren</button>
+{{else}}<input type="hidden" name="state" value="unlock"><button>Internet freigeben</button>{{end}}</form>{{end}}
+</div>
+
+<div class="card"><h2>WLANs (Reihenfolge = Priorität)</h2>
+{{if .Cfg.WLANs}}<ul class="list">{{range $i, $w := .Cfg.WLANs}}<li><span>{{add $i 1}}. {{$w.SSID}}{{if not $w.Pass}} <span class="mut">(offen)</span>{{end}}</span><span>
+{{if $i}}<form method="post" action="/settings/wlanup" class="inline"><input type="hidden" name="i" value="{{$i}}"><button class="sec">↑</button></form>{{end}}
+<form method="post" action="/settings/wlandel" class="inline" onsubmit="return confirm('WLAN löschen?')"><input type="hidden" name="i" value="{{$i}}"><button class="danger">löschen</button></form></span></li>{{end}}</ul>
+{{else}}<p class="mut">Noch keine WLANs – auf der <a href="/">Übersicht</a> hinzufügen.</p>{{end}}
+</div>
+
+<div class="card"><h2>LTE / Mobilfunk</h2>
+<form method="post" action="/settings/lte">
+<label class="chk"><input type="checkbox" name="enabled" {{if .Cfg.LTE.Enabled}}checked{{end}}> LTE nutzen</label>
+<div class="grid">
+<div><label>APN</label><input type="text" name="apn" value="{{.Cfg.LTE.APN}}" placeholder="z. B. internet.telekom"></div>
+<div><label>SIM-PIN (leer = unverändert{{if .Cfg.LTE.PIN}}, gesetzt{{end}})</label><input type="password" name="pin" maxlength="8" inputmode="numeric" autocomplete="off"></div>
+<div><label>APN-Benutzer (meist leer)</label><input type="text" name="user" value="{{.Cfg.LTE.User}}"></div>
+<div><label>APN-Passwort (leer = unverändert)</label><input type="password" name="pass" autocomplete="off"></div>
+</div>
+<label class="chk"><input type="checkbox" name="roaming" {{if .Cfg.LTE.Roaming}}checked{{end}}> Roaming erlauben</label>
+<label class="chk"><input type="checkbox" name="pin_clear"> gespeicherte PIN löschen</label>
+<button>Speichern</button></form></div>
+
+<div class="card"><h2>WireGuard</h2>
+<form method="post" action="/settings/wg">
+<div class="grid">
+<div><label>Private Key (leer = unverändert{{if .Cfg.WG.Priv}}, gesetzt{{end}})</label><input type="password" name="priv" autocomplete="off"></div>
+<div><label>Peer Public Key</label><input type="text" name="pub" value="{{.Cfg.WG.Pub}}"></div>
+<div><label>Preshared Key (leer = unverändert{{if .Cfg.WG.PSK}}, gesetzt{{end}})</label><input type="password" name="psk" autocomplete="off"></div>
+<div><label>Endpoint (Host/IP)</label><input type="text" name="endpoint" value="{{.Cfg.WG.Endpoint}}"></div>
+<div><label>Port</label><input type="number" name="port" value="{{.Cfg.WG.Port}}" min="1" max="65535"></div>
+<div><label>Keepalive (s)</label><input type="number" name="keepalive" value="{{.Cfg.WG.Keepalive}}" min="0" max="3600"></div>
+<div><label>Tunnel-IP</label><input type="text" name="addr" value="{{.Cfg.WG.Addr}}"></div>
+<div><label>Maske</label><input type="text" name="mask" value="{{.Cfg.WG.Mask}}"></div>
+<div><label>DNS im Volltunnel</label><input type="text" name="dns" value="{{.Cfg.WG.DNS}}"></div>
+<div><label>MTU</label><input type="number" name="mtu" value="{{.Cfg.WG.MTU}}" min="1280" max="1500"></div>
+</div>
+<label>Zusätzliche Netze im Split-Modus (CIDR, kommagetrennt)</label><input type="text" name="allowed" value="{{.Cfg.WG.Allowed}}" placeholder="z. B. 10.20.0.0/16">
+<label class="chk"><input type="checkbox" name="fulltunnel" {{if .Cfg.WG.FullTunnel}}checked{{end}}> Volltunnel (gesamter PC-Verkehr durchs VPN)</label>
+<label class="chk"><input type="checkbox" name="killswitch" {{if .Cfg.WG.KillSwitch}}checked{{end}}> Kill-Switch (ohne Tunnel kein Internet)</label>
+<label class="chk"><input type="checkbox" name="psk_clear"> Preshared Key entfernen</label>
+<button>Speichern</button></form>
+<form method="post" action="/settings/vpn">{{if .Cfg.WG.VPNOff}}<input type="hidden" name="state" value="on"><button>VPN einschalten</button>{{else}}<input type="hidden" name="state" value="off"><button class="sec">VPN ausschalten</button>{{end}}</form>
+</div>
+
+<div class="card"><h2>Ressourcen &amp; Dateien</h2>
+{{if .Cfg.Resources}}<ul class="list">{{range $i, $r := .Cfg.Resources}}<li><span>{{$r.Name}} <span class="mut">{{$r.Type}} · {{$r.Addr}}{{if $r.Port}}:{{$r.Port}}{{end}}</span></span>
+<form method="post" action="/settings/resdel" class="inline"><input type="hidden" name="i" value="{{$i}}"><button class="danger">löschen</button></form></li>{{end}}</ul>{{end}}
+<form method="post" action="/settings/res"><div class="grid">
+<div><label>Name</label><input type="text" name="name" maxlength="40"></div>
+<div><label>Typ</label><select name="type"><option value="rdp">RDP</option><option value="link">Link</option><option value="ssh">SSH</option></select></div>
+<div><label>Adresse / URL</label><input type="text" name="addr"></div>
+<div><label>Port (leer = Standard)</label><input type="number" name="port" min="0" max="65535"></div>
+</div><button>Ressource anlegen</button></form>
+<hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+{{if .Files}}<ul class="list">{{range .Files}}<li><span>{{.Name}} <span class="mut">{{bytes .Size}}</span></span>
+<form method="post" action="/settings/delfile" class="inline"><input type="hidden" name="name" value="{{.Name}}"><button class="danger">löschen</button></form></li>{{end}}</ul>{{end}}
+<form method="post" action="/settings/upload" enctype="multipart/form-data"><label>Datei zum Download bereitstellen (max. 64 MB je Datei · belegt {{bytes .FilesUsed}} von {{bytes .FilesQuota}})</label><input type="file" name="file" required><br><button>Hochladen</button></form>
+</div>
+
+<div class="card"><h2>Zabbix-Überwachung</h2>
+{{if .Cfg.Zabbix.Enabled}}<div class="row"><span>Dienste</span><span>Proxy: <b>{{index .Services "zabbix-proxy"}}</b> · Agent: <b>{{index .Services "zabbix-agent"}}</b></span></div>{{end}}
+{{with .ZbxWarn}}<div class="msg alert" style="margin:8px 0">{{.}}</div>{{end}}
+<form method="post" action="/settings/zabbix">
+<label class="chk"><input type="checkbox" name="enabled" {{if .Cfg.Zabbix.Enabled}}checked{{end}}> Zabbix-Proxy + Agent aktiv (aktiver Proxy, verbindet sich durch den Tunnel zum Server)</label>
+<div class="grid">
+<div><label>Zabbix-Server (Adresse im Tunnel, optional :Port)</label><input type="text" name="server" value="{{.Cfg.Zabbix.Server}}" placeholder="z. B. 10.10.0.10"></div>
+<div><label>Proxy-Name (so auf dem Server anlegen)</label><input type="text" name="proxy_name" value="{{.Cfg.Zabbix.ProxyName}}" placeholder="{{.ZbxProxy}}"></div>
+<div><label>Host-Name des Sticks</label><input type="text" name="host_name" value="{{.Cfg.Zabbix.HostName}}" placeholder="{{.ZbxHost}}"></div>
+<div></div>
+<div><label>PSK-Identität (optional)</label><input type="text" name="psk_identity" value="{{.Cfg.Zabbix.PSKIdentity}}"></div>
+<div><label>PSK hex (leer = unverändert{{if .Cfg.Zabbix.PSK}}, gesetzt{{end}})</label><input type="password" name="psk" autocomplete="off"></div>
+</div>
+<label class="chk"><input type="checkbox" name="psk_clear"> PSK entfernen</label>
+<p class="mut" style="margin:10px 0 0">Was überwacht wird (der Stick selbst immer – CPU, RAM, Flash, Uplink):</p>
+<label class="chk"><input type="checkbox" name="mon_wlan" {{if .Cfg.Zabbix.MonWLAN}}checked{{end}}> verbundenes WLAN – Signal, SSID, Erreichbarkeit/Latenz des Gateways</label>
+<label class="chk"><input type="checkbox" name="mon_lte" {{if .Cfg.Zabbix.MonLTE}}checked{{end}}> LTE – Signal, Netz, Zustand</label>
+<label class="chk"><input type="checkbox" name="mon_vpn" {{if .Cfg.Zabbix.MonVPN}}checked{{end}}> VPN – Tunnel, Handshake, Durchsatz</label>
+<label class="chk"><input type="checkbox" name="mon_pc" {{if .Cfg.Zabbix.MonPC}}checked{{end}}> PC am USB anpingen{{with .St.PCIP}} ({{.}}{{with $.St.PCName}}, {{.}}{{end}}){{end}}</label>
+<label class="chk"><input type="checkbox" name="pc_agent" {{if .Cfg.Zabbix.PCAgent}}checked{{end}}> Zabbix-Agent auf dem PC darf an den Proxy melden (ServerActive=192.168.226.1)</label>
+<button>Speichern</button></form>
+<p class="mut" style="margin:14px 0 4px">Weitere Ping-Ziele (z. B. Geräte im WLAN am Uplink):</p>
+{{if .Cfg.Zabbix.Targets}}<ul class="list">{{range $i, $t := .Cfg.Zabbix.Targets}}<li><span>{{$t.Name}} <span class="mut">{{$t.Addr}}</span></span>
+<form method="post" action="/settings/zbxtargetdel" class="inline"><input type="hidden" name="i" value="{{$i}}"><button class="danger">löschen</button></form></li>{{end}}</ul>{{end}}
+<form method="post" action="/settings/zbxtarget"><div class="grid">
+<div><label>Name</label><input type="text" name="name" maxlength="64"></div>
+<div><label>Adresse</label><input type="text" name="addr" placeholder="192.168.1.20"></div>
+</div><button>Ziel hinzufügen</button></form>
+</div>
+
+<div class="card"><h2>Systemupdate</h2>
+<div class="row"><span>Letzter Lauf</span><span>{{index .Services "vpndongle-update.service"}} · Zeitplan: {{index .Services "vpndongle-update.timer"}}</span></div>
+<form method="post" action="/settings/updatecfg">
+<label class="chk"><input type="checkbox" name="auto" {{if .Cfg.Update.Auto}}checked{{end}}> wöchentlich automatisch (So. nachts)</label>
+<label class="chk"><input type="checkbox" name="allow_lte" {{if .Cfg.Update.AllowLTE}}checked{{end}}> auch über LTE (Datenvolumen!)</label>
+<label class="chk"><input type="checkbox" name="auto_reboot" {{if .Cfg.Update.AutoReboot}}checked{{end}}> neu starten, wenn ein Update es verlangt</label>
+<label class="chk"><input type="checkbox" name="github" {{if .Cfg.Update.GitHub}}checked{{end}}> VPN-Dongle-Software aus GitHub-Releases aktualisieren (nur neuere Versionen mit gültiger Signatur)</label>
+<button>Speichern</button></form>
+<div class="row"><span>Software</span><span><code>{{.Version}}</code> · <span id="swst" class="mut">neueste Version noch nicht geprüft</span></span></div>
+<button type="button" class="sec" onclick="swchk()">Nach neuer Version suchen</button>
+<form method="post" action="/settings/update" class="inline" onsubmit="return confirm('Debian- und Zabbix-Pakete jetzt aktualisieren?')"><button>Jetzt aktualisieren</button></form>
+<a class="btn sec" style="background:var(--line);color:var(--fg)" href="/settings/updatelog" target="_blank">Update-Protokoll</a>
+<form method="post" action="/settings/updatepkg" enctype="multipart/form-data">
+<label>VPN-Dongle-Software aktualisieren (vpndongle-&lt;version&gt;.tar.gz aus tools\build.ps1)</label><input type="file" name="pkg" accept=".gz" required><br>
+<button>Paket einspielen</button></form>
+<p class="mut" style="font-size:13px;margin-bottom:0">Kernel- und Firmware-Pakete werden nicht aktualisiert (gehalten), weil der Kernel des Sticks nicht aus Debian kommt.</p>
+</div>
+
+<div class="card"><h2>Konfiguration sichern / einspielen</h2>
+<p class="mut" style="margin-top:0">Verschlüsselt mit dem Konfig-Secret (Format BHVPN1, kompatibel zu <code>admin.ps1</code> und zum ESP-Dongle).</p>
+<a class="btn" href="/settings/export">Konfig herunterladen</a>
+<form method="post" action="/settings/import" enctype="multipart/form-data">
+<label>Konfig-Datei einspielen (fehlende Bereiche bleiben erhalten)</label><input type="file" name="file" required>
+<label>Secret (leer = gespeichertes)</label><input type="password" name="secret" maxlength="20" autocomplete="off">
+<button>Einspielen</button></form>
+{{if .Cfg.Server}}<p>Config-Server: <span id="cfgst" class="mut">{{if ge .St.CfgAvail 0}}Version {{.St.CfgAvail}}{{if .St.CfgNews}} – <b>neu!</b>{{end}}{{else}}noch nicht geprüft{{end}}</span></p>
+<button type="button" class="sec" onclick="chk()">Jetzt prüfen</button>
+<form method="post" action="/settings/apply" class="inline" onsubmit="return confirm('Konfig vom Server einspielen?')"><button>Vom Server einspielen</button></form>{{end}}
+</div>
+
+<div class="card"><h2>Zugang</h2>
+<form method="post" action="/settings/admin"><div class="grid">
+<div><label>Benutzer</label><input type="text" name="user" value="{{.Cfg.Admin.User}}"></div><div></div>
+<div><label>Neues Passwort (min. 8)</label><input type="password" name="pw" autocomplete="new-password"></div>
+<div><label>Wiederholen</label><input type="password" name="pw2" autocomplete="new-password"></div>
+</div><button>Ändern</button></form></div>
+
+<div class="card"><h2>Zugriff auf den Stick</h2>
+<p class="mut" style="margin-top:0;font-size:13px">Welcher Dienst des Sticks ist aus welchem Netz erreichbar. Haken = erlaubt (Firewall).</p>
+<form method="post" action="/settings/access">
+<table class="acc"><thead><tr><th></th>{{range .AccessCols}}<th>{{.Label}}</th>{{end}}</tr></thead><tbody>
+{{range .AccessRows}}<tr><td>{{.Label}} <span class="mut">{{.Hint}}</span></td>{{range .Cells}}<td><input type="checkbox" name="{{.Name}}" aria-label="{{.Name}}" {{if .Checked}}checked{{end}} {{if .Fixed}}disabled title="{{.Title}}"{{end}}></td>{{end}}</tr>
+{{end}}</tbody></table>
+<button>Speichern</button></form>
+<p class="mut" style="font-size:13px;margin-bottom:0">Weboberfläche über USB ist immer an. Über andere Netze erst, wenn das Admin-Passwort geändert ist – dort ist dann auch die Übersicht ohne Login erreichbar (WLAN hinzufügen, Dateien laden). DNS und DHCP gibt es nur im USB-Netz.</p>
+</div>
+
+<div class="card"><h2>SSH-Zugang</h2>
+<div class="row"><span>sshd</span><span><b>{{index .Services "ssh"}}</b></span></div>
+<div class="row"><span>erreichbar über</span><span>USB: <code>ssh root@192.168.226.1</code>{{if .Cfg.WG.Addr}} · VPN: <code>ssh root@{{.Cfg.WG.Addr}}</code>{{end}}</span></div>
+{{if .St.SSHFallback}}<div class="msg alert" style="margin:8px 0">USB-Netz fehlt – SSH-Notfallmodus: SSH ist vorübergehend auch über WLAN/LTE erreichbar.</div>
+{{else}}<p class="mut" style="font-size:13px">Aus welchen Netzen SSH erreichbar ist, steht unter „Zugriff auf den Stick“. Fällt das USB-Netz aus, wird SSH als Notzugang aus allen Netzen geöffnet.</p>{{end}}
+<div class="row"><span>Root-Passwort</span><span>{{if .Cfg.RootPWSet.IsZero}}<span class="bad">noch nicht über die Weboberfläche gesetzt</span>{{else}}gesetzt am {{.Cfg.RootPWSet.Format "02.01.2006 15:04"}}{{end}}</span></div>
+<form method="post" action="/settings/rootpw"><div class="grid">
+<div><label>Neues Root-Passwort (min. 10 Zeichen)</label><input type="password" name="pw" autocomplete="new-password"></div>
+<div><label>Wiederholen</label><input type="password" name="pw2" autocomplete="new-password"></div>
+</div><button>Root-Passwort setzen</button></form>
+<p class="mut" style="font-size:13px;margin-bottom:0">Wird nicht in der Konfig gespeichert und nicht exportiert. SSH-Schlüssel in <code>/root/.ssh/authorized_keys</code> funktionieren weiterhin.</p>
+</div>
+
+<div class="card"><h2>Zurücksetzen</h2>
+<form method="post" action="/settings/reset" onsubmit="return confirm('Wirklich zurücksetzen?')">
+<select name="scope"><option value="wifi">WLANs</option><option value="wg">WireGuard</option><option value="lte">LTE</option><option value="wifiwg">WLANs + WireGuard</option><option value="all">Alles (Werkseinstellung, admin/admin)</option></select>
+<input type="hidden" name="confirm" value="ja"><button class="danger">Zurücksetzen</button></form></div>
+<script>
+function swchk(){var e=document.getElementById('swst');e.textContent='prüfe …';
+fetch('/settings/swcheck').then(function(r){return r.json()}).then(function(j){
+e.textContent=j.fehler?('Fehler: '+j.fehler):('neuestes Release '+j.release+(j.neu?' – Update verfügbar („Jetzt aktualisieren“)':' – aktuell'))})}
+function chk(){var e=document.getElementById('cfgst');e.textContent='prüfe …';
+fetch('/settings/check').then(function(r){return r.json()}).then(function(j){
+e.textContent=j.fehler?('Fehler: '+j.fehler):('Server-Version '+j.version+', hier '+j.aktuell+(j.neu?' – neue Konfig verfügbar':' – aktuell'))})}
+</script>
+{{template "foot" .}}{{end}}

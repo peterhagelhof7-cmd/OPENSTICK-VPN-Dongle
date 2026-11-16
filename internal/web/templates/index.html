@@ -1,0 +1,34 @@
+{{define "index"}}{{template "head" .}}
+{{template "status" .}}
+
+<div class="card"><h2>WLAN verbinden</h2>
+<form method="post" action="/wifi">
+<label for="ssid">Netzwerk (SSID)</label><input type="text" id="ssid" name="ssid" maxlength="32" required>
+<div id="scan" class="mut" style="font-size:13px;margin-top:6px"></div>
+<label for="pass">Passwort (leer bei offenem WLAN)</label><input type="password" id="pass" name="pass" maxlength="64" autocomplete="off">
+<button type="submit">Speichern und verbinden</button>
+<button type="button" class="sec" onclick="scan()">Netzwerke suchen</button>
+</form>
+{{if .Cfg.WLANs}}<p class="mut" style="font-size:13px;margin-bottom:0">Bekannt (Reihenfolge = Priorität): {{range $i, $w := .Cfg.WLANs}}{{if $i}}, {{end}}{{$w.SSID}}{{end}}</p>{{end}}
+</div>
+
+{{if .Cfg.Resources}}<div class="card"><h2>Interne Ressourcen</h2><ul class="list">
+{{range $i, $r := .Cfg.Resources}}<li><span>{{$r.Name}} <span class="mut">({{$r.Type}})</span></span><span>
+{{if eq $r.Type "rdp"}}<a class="btn" style="margin:0" href="/rdp?i={{$i}}">RDP-Datei</a>
+{{else if eq $r.Type "ssh"}}<a class="btn" style="margin:0" href="{{sshurl $r.Addr $r.Port}}">SSH</a>
+{{else}}<a class="btn" style="margin:0" href="{{link $r.Addr}}" target="_blank" rel="noopener">Öffnen</a>{{end}}</span></li>{{end}}
+</ul></div>{{end}}
+
+{{if .Files}}<div class="card"><h2>Dateien</h2><ul class="list">
+{{range .Files}}<li><span>{{.Name}} <span class="mut">{{bytes .Size}}</span></span><a class="btn" style="margin:0" href="/dl?name={{.Name}}">Laden</a></li>{{end}}
+</ul></div>{{end}}
+
+<script>
+function scan(){var d=document.getElementById('scan');d.textContent='Suche …';
+fetch('/scan').then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(a){d.textContent='';
+if(!a.length){d.textContent='Keine Netze gefunden.';return}
+a.forEach(function(n){var b=document.createElement('button');b.type='button';b.className='sec';b.style.margin='3px 6px 0 0';
+b.textContent=n.ssid+' '+n.signal+'%'+(n.lock?' 🔒':'');b.onclick=function(){document.getElementById('ssid').value=n.ssid;document.getElementById('pass').focus()};d.appendChild(b)})
+}).catch(function(){d.textContent='Suche fehlgeschlagen.'})}
+</script>
+{{template "foot" .}}{{end}}

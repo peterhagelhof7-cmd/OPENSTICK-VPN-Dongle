@@ -1,0 +1,1071 @@
+{
+  "zabbix_export": {
+    "template_groups": [
+      {
+        "name": "Templates/Network devices",
+        "uuid": "36bff6c29af64692839d077febfc7079"
+      }
+    ],
+    "templates": [
+      {
+        "description": "VPN-Dongle (UZ801/OpenStick) mit vpndongled: Uplink WLAN/LTE, VPN, WLAN-Gateway, PC, weitere Ziele.\nAutoregistrierung über HostMetadata \"openstick-vpn-dongle\"; die Überwachungsbereiche schaltet man in der Weboberfläche des Sticks.",
+        "discovery_rules": [
+          {
+            "delay": "5m",
+            "description": "Schalter „verbundenes WLAN“ in der Weboberfläche.",
+            "item_prototypes": [
+              {
+                "delay": "0",
+                "key": "vpndongle.wlan.up[{#IF}]",
+                "master_item": {
+                  "key": "vpndongle.status"
+                },
+                "name": "WLAN: verbunden",
+                "preprocessing": [
+                  {
+                    "parameters": [
+                      "$.wlan_up"
+                    ],
+                    "type": "JSONPATH"
+                  },
+                  {
+                    "type": "BOOL_TO_DECIMAL"
+                  }
+                ],
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "wlan"
+                  }
+                ],
+                "trigger_prototypes": [
+                  {
+                    "expression": "max(/OpenStick-VPN-Dongle/vpndongle.wlan.up[{#IF}],{$VPNDONGLE.WLAN.DOWN})=0",
+                    "name": "WLAN getrennt seit {$VPNDONGLE.WLAN.DOWN}",
+                    "priority": "WARNING",
+                    "uuid": "90a1a160008a424c985433d22f7f553d"
+                  }
+                ],
+                "type": "DEPENDENT",
+                "uuid": "a3821623aee14f93918e3a1ebc9943bc",
+                "valuemap": {
+                  "name": "VPN-Dongle Ja/Nein"
+                }
+              },
+              {
+                "delay": "0",
+                "key": "vpndongle.wlan.signal[{#IF}]",
+                "master_item": {
+                  "key": "vpndongle.status"
+                },
+                "name": "WLAN: Signal",
+                "preprocessing": [
+                  {
+                    "parameters": [
+                      "$.wlan_signal"
+                    ],
+                    "type": "JSONPATH"
+                  }
+                ],
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "wlan"
+                  }
+                ],
+                "trigger_prototypes": [
+                  {
+                    "expression": "avg(/OpenStick-VPN-Dongle/vpndongle.wlan.signal[{#IF}],15m)<{$VPNDONGLE.WLAN.SIGNAL.MIN} and last(/OpenStick-VPN-Dongle/vpndongle.wlan.up[{#IF}])=1",
+                    "name": "WLAN: schwaches Signal (<{$VPNDONGLE.WLAN.SIGNAL.MIN}%)",
+                    "priority": "WARNING",
+                    "uuid": "c3e8d5b059334eb7866c46a4bf447631"
+                  }
+                ],
+                "type": "DEPENDENT",
+                "units": "%",
+                "uuid": "fb98ee89c922466d9f4f015d7149154c"
+              },
+              {
+                "delay": "0",
+                "key": "vpndongle.wlan.ssid[{#IF}]",
+                "master_item": {
+                  "key": "vpndongle.status"
+                },
+                "name": "WLAN: SSID",
+                "preprocessing": [
+                  {
+                    "parameters": [
+                      "$.wlan_ssid"
+                    ],
+                    "type": "JSONPATH"
+                  },
+                  {
+                    "parameters": [
+                      "1h"
+                    ],
+                    "type": "DISCARD_UNCHANGED_HEARTBEAT"
+                  }
+                ],
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "wlan"
+                  }
+                ],
+                "type": "DEPENDENT",
+                "uuid": "212a3859633449528b4864417e4f79f7",
+                "value_type": "CHAR"
+              }
+            ],
+            "key": "vpndongle.discovery[wlan]",
+            "lifetime": "1d",
+            "name": "WLAN am Uplink",
+            "type": "ZABBIX_ACTIVE",
+            "uuid": "04bb366187df445d9c15530cea138950"
+          },
+          {
+            "delay": "5m",
+            "description": "Ping auf das Gateway des verbundenen WLANs (Simple Check auf dem Proxy des Sticks).",
+            "item_prototypes": [
+              {
+                "key": "icmpping[{#WLANGW},3]",
+                "name": "WLAN-Gateway {#WLANGW}: erreichbar",
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "wlan"
+                  }
+                ],
+                "trigger_prototypes": [
+                  {
+                    "expression": "max(/OpenStick-VPN-Dongle/icmpping[{#WLANGW},3],#3)=0",
+                    "name": "WLAN-Gateway {#WLANGW} nicht erreichbar",
+                    "priority": "AVERAGE",
+                    "uuid": "2e14ec9a58d74991bca76f6e0785f120"
+                  }
+                ],
+                "type": "SIMPLE",
+                "uuid": "1e8fcefb62ff4d1eaeb3876f052dfda1",
+                "valuemap": {
+                  "name": "Service state"
+                }
+              },
+              {
+                "key": "icmppingloss[{#WLANGW},3]",
+                "name": "WLAN-Gateway {#WLANGW}: Paketverlust",
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "wlan"
+                  }
+                ],
+                "trigger_prototypes": [
+                  {
+                    "expression": "min(/OpenStick-VPN-Dongle/icmppingloss[{#WLANGW},3],5m)>{$VPNDONGLE.LOSS.WARN} and min(/OpenStick-VPN-Dongle/icmppingloss[{#WLANGW},3],5m)<100",
+                    "name": "WLAN-Gateway {#WLANGW}: hoher Paketverlust",
+                    "priority": "WARNING",
+                    "uuid": "f1e2f580fb7143acbf55e5daec26fee0"
+                  }
+                ],
+                "type": "SIMPLE",
+                "units": "%",
+                "uuid": "1e1499c13fb641c086e1742152fa6bfd",
+                "value_type": "FLOAT"
+              },
+              {
+                "key": "icmppingsec[{#WLANGW},3,,,,avg]",
+                "name": "WLAN-Gateway {#WLANGW}: Antwortzeit",
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "wlan"
+                  }
+                ],
+                "trigger_prototypes": [
+                  {
+                    "expression": "avg(/OpenStick-VPN-Dongle/icmppingsec[{#WLANGW},3,,,,avg],5m)>{$VPNDONGLE.RTT.WARN}",
+                    "name": "WLAN-Gateway {#WLANGW}: hohe Antwortzeit",
+                    "priority": "WARNING",
+                    "uuid": "70c26ba6e197457eba00007485c7cfbb"
+                  }
+                ],
+                "type": "SIMPLE",
+                "units": "s",
+                "uuid": "e52ba3f8786a4b378410b35310add371",
+                "value_type": "FLOAT"
+              }
+            ],
+            "key": "vpndongle.discovery[wlangw]",
+            "lifetime": "1d",
+            "name": "WLAN-Gateway",
+            "type": "ZABBIX_ACTIVE",
+            "uuid": "7ca6b35221aa4c5c9b0b02439cce0a16"
+          },
+          {
+            "delay": "5m",
+            "description": "Ping auf den PC am USB-Anschluss. Windows beantwortet Ping nur, wenn die Firewall ICMP erlaubt.",
+            "item_prototypes": [
+              {
+                "key": "icmpping[{#PCIP},3]",
+                "name": "PC {#PCIP}: erreichbar",
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "pc"
+                  }
+                ],
+                "trigger_prototypes": [
+                  {
+                    "description": "Häufig nur die Windows-Firewall (ICMP-Echo eingehend).",
+                    "expression": "max(/OpenStick-VPN-Dongle/icmpping[{#PCIP},3],#3)=0",
+                    "name": "PC {#PCIP} antwortet nicht auf Ping",
+                    "priority": "INFO",
+                    "uuid": "d9289936bc5b47cfb627873e8d8b410a"
+                  }
+                ],
+                "type": "SIMPLE",
+                "uuid": "de07182b14cd4fd28d5bd7cb423e7ef7",
+                "valuemap": {
+                  "name": "Service state"
+                }
+              },
+              {
+                "key": "icmppingloss[{#PCIP},3]",
+                "name": "PC {#PCIP}: Paketverlust",
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "pc"
+                  }
+                ],
+                "trigger_prototypes": [
+                  {
+                    "expression": "min(/OpenStick-VPN-Dongle/icmppingloss[{#PCIP},3],5m)>{$VPNDONGLE.LOSS.WARN} and min(/OpenStick-VPN-Dongle/icmppingloss[{#PCIP},3],5m)<100",
+                    "name": "PC {#PCIP}: hoher Paketverlust",
+                    "priority": "WARNING",
+                    "uuid": "33aabd1a464748238f8384df5790c787"
+                  }
+                ],
+                "type": "SIMPLE",
+                "units": "%",
+                "uuid": "917a2ebdf7e0415b9c641d6580a1c90b",
+                "value_type": "FLOAT"
+              },
+              {
+                "key": "icmppingsec[{#PCIP},3,,,,avg]",
+                "name": "PC {#PCIP}: Antwortzeit",
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "pc"
+                  }
+                ],
+                "trigger_prototypes": [
+                  {
+                    "expression": "avg(/OpenStick-VPN-Dongle/icmppingsec[{#PCIP},3,,,,avg],5m)>{$VPNDONGLE.RTT.WARN}",
+                    "name": "PC {#PCIP}: hohe Antwortzeit",
+                    "priority": "WARNING",
+                    "uuid": "a779abec2ce84af1b44d0dd9fdae7337"
+                  }
+                ],
+                "type": "SIMPLE",
+                "units": "s",
+                "uuid": "44a71db063f64db0ad4fcfd2af81f353",
+                "value_type": "FLOAT"
+              }
+            ],
+            "key": "vpndongle.discovery[pc]",
+            "lifetime": "1d",
+            "name": "PC am USB",
+            "type": "ZABBIX_ACTIVE",
+            "uuid": "8125bf9037b348f9830756a839fccbf4"
+          },
+          {
+            "delay": "5m",
+            "description": "Schalter „LTE“ in der Weboberfläche (nur wenn ein APN eingerichtet ist).",
+            "item_prototypes": [
+              {
+                "delay": "0",
+                "key": "vpndongle.lte.up[{#IF}]",
+                "master_item": {
+                  "key": "vpndongle.status"
+                },
+                "name": "LTE: verbunden",
+                "preprocessing": [
+                  {
+                    "parameters": [
+                      "$.lte_up"
+                    ],
+                    "type": "JSONPATH"
+                  },
+                  {
+                    "type": "BOOL_TO_DECIMAL"
+                  }
+                ],
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "lte"
+                  }
+                ],
+                "type": "DEPENDENT",
+                "uuid": "c32c97cbf478430197e47597ec2e3d3f",
+                "valuemap": {
+                  "name": "VPN-Dongle Ja/Nein"
+                }
+              },
+              {
+                "delay": "0",
+                "key": "vpndongle.lte.signal[{#IF}]",
+                "master_item": {
+                  "key": "vpndongle.status"
+                },
+                "name": "LTE: Signal",
+                "preprocessing": [
+                  {
+                    "parameters": [
+                      "$.lte.signal"
+                    ],
+                    "type": "JSONPATH"
+                  }
+                ],
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "lte"
+                  }
+                ],
+                "trigger_prototypes": [
+                  {
+                    "expression": "avg(/OpenStick-VPN-Dongle/vpndongle.lte.signal[{#IF}],15m)<{$VPNDONGLE.LTE.SIGNAL.MIN} and last(/OpenStick-VPN-Dongle/vpndongle.lte.up[{#IF}])=1",
+                    "name": "LTE: schwaches Signal (<{$VPNDONGLE.LTE.SIGNAL.MIN}%)",
+                    "priority": "WARNING",
+                    "uuid": "cbc2e6edccde422b903926511fe3ee1c"
+                  }
+                ],
+                "type": "DEPENDENT",
+                "units": "%",
+                "uuid": "cad4ef4708254b1ca152fbd1aa2cb9bb"
+              },
+              {
+                "delay": "0",
+                "key": "vpndongle.lte.state[{#IF}]",
+                "master_item": {
+                  "key": "vpndongle.status"
+                },
+                "name": "LTE: Zustand",
+                "preprocessing": [
+                  {
+                    "error_handler": "CUSTOM_VALUE",
+                    "error_handler_params": "kein Modem",
+                    "parameters": [
+                      "$.lte.state"
+                    ],
+                    "type": "JSONPATH"
+                  }
+                ],
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "lte"
+                  }
+                ],
+                "type": "DEPENDENT",
+                "uuid": "6516c0dd0bd84f388993b54844add952",
+                "value_type": "CHAR"
+              },
+              {
+                "delay": "0",
+                "key": "vpndongle.lte.operator[{#IF}]",
+                "master_item": {
+                  "key": "vpndongle.status"
+                },
+                "name": "LTE: Netz",
+                "preprocessing": [
+                  {
+                    "error_handler": "CUSTOM_VALUE",
+                    "error_handler_params": "-",
+                    "parameters": [
+                      "$.lte.operator"
+                    ],
+                    "type": "JSONPATH"
+                  },
+                  {
+                    "parameters": [
+                      "1h"
+                    ],
+                    "type": "DISCARD_UNCHANGED_HEARTBEAT"
+                  }
+                ],
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "lte"
+                  }
+                ],
+                "type": "DEPENDENT",
+                "uuid": "f171d357734744a1985c6327316a61a5",
+                "value_type": "CHAR"
+              },
+              {
+                "delay": "0",
+                "key": "vpndongle.lte.tech[{#IF}]",
+                "master_item": {
+                  "key": "vpndongle.status"
+                },
+                "name": "LTE: Technik",
+                "preprocessing": [
+                  {
+                    "error_handler": "CUSTOM_VALUE",
+                    "error_handler_params": "-",
+                    "parameters": [
+                      "$.lte.tech"
+                    ],
+                    "type": "JSONPATH"
+                  }
+                ],
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "lte"
+                  }
+                ],
+                "type": "DEPENDENT",
+                "uuid": "ffee1c07be5f49739e3a60f286a6ca6d",
+                "value_type": "CHAR"
+              },
+              {
+                "delay": "0",
+                "key": "vpndongle.lte.unlock[{#IF}]",
+                "master_item": {
+                  "key": "vpndongle.status"
+                },
+                "name": "LTE: SIM-Sperre",
+                "preprocessing": [
+                  {
+                    "error_handler": "CUSTOM_VALUE",
+                    "error_handler_params": "-",
+                    "parameters": [
+                      "$.lte.unlock"
+                    ],
+                    "type": "JSONPATH"
+                  }
+                ],
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "lte"
+                  }
+                ],
+                "trigger_prototypes": [
+                  {
+                    "description": "PIN/PUK nötig – in der Weboberfläche unter LTE eintragen.",
+                    "expression": "last(/OpenStick-VPN-Dongle/vpndongle.lte.unlock[{#IF}])<>\"-\"",
+                    "name": "LTE: SIM verlangt {ITEM.LASTVALUE1}",
+                    "priority": "HIGH",
+                    "uuid": "92f4317488df4bddbf8aed2455c33efd"
+                  }
+                ],
+                "type": "DEPENDENT",
+                "uuid": "520b114032a5463788ee5fe0b217d7e9",
+                "value_type": "CHAR"
+              }
+            ],
+            "key": "vpndongle.discovery[lte]",
+            "lifetime": "1d",
+            "name": "LTE / Mobilfunk",
+            "type": "ZABBIX_ACTIVE",
+            "uuid": "2ae019ef2c1a436fab3d3ef6da487434"
+          },
+          {
+            "delay": "5m",
+            "description": "Schalter „VPN“ in der Weboberfläche (nur wenn WireGuard eingerichtet ist).",
+            "item_prototypes": [
+              {
+                "delay": "0",
+                "key": "vpndongle.vpn.on[{#IF}]",
+                "master_item": {
+                  "key": "vpndongle.status"
+                },
+                "name": "VPN: soll laufen",
+                "preprocessing": [
+                  {
+                    "parameters": [
+                      "$.vpn_on"
+                    ],
+                    "type": "JSONPATH"
+                  },
+                  {
+                    "type": "BOOL_TO_DECIMAL"
+                  }
+                ],
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "vpn"
+                  }
+                ],
+                "type": "DEPENDENT",
+                "uuid": "923c2c0b7e3d4b128e8cb04ad296d2e9",
+                "valuemap": {
+                  "name": "VPN-Dongle Ja/Nein"
+                }
+              },
+              {
+                "delay": "0",
+                "key": "vpndongle.vpn.up[{#IF}]",
+                "master_item": {
+                  "key": "vpndongle.status"
+                },
+                "name": "VPN: verbunden",
+                "preprocessing": [
+                  {
+                    "parameters": [
+                      "$.vpn_up"
+                    ],
+                    "type": "JSONPATH"
+                  },
+                  {
+                    "type": "BOOL_TO_DECIMAL"
+                  }
+                ],
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "vpn"
+                  }
+                ],
+                "trigger_prototypes": [
+                  {
+                    "expression": "max(/OpenStick-VPN-Dongle/vpndongle.vpn.up[{#IF}],{$VPNDONGLE.VPN.DOWN})=0 and last(/OpenStick-VPN-Dongle/vpndongle.vpn.on[{#IF}])=1",
+                    "name": "VPN-Tunnel getrennt seit {$VPNDONGLE.VPN.DOWN}",
+                    "priority": "HIGH",
+                    "uuid": "315f3c35212e4cd3b240b9da11243c35"
+                  }
+                ],
+                "type": "DEPENDENT",
+                "uuid": "085bbd65211f4437b3ef83a508d74251",
+                "valuemap": {
+                  "name": "VPN-Dongle Ja/Nein"
+                }
+              },
+              {
+                "delay": "0",
+                "key": "vpndongle.vpn.handshake[{#IF}]",
+                "master_item": {
+                  "key": "vpndongle.status"
+                },
+                "name": "VPN: Alter des letzten Handshakes",
+                "preprocessing": [
+                  {
+                    "parameters": [
+                      "$.handshake_age"
+                    ],
+                    "type": "JSONPATH"
+                  }
+                ],
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "vpn"
+                  }
+                ],
+                "type": "DEPENDENT",
+                "units": "s",
+                "uuid": "f434ba5f9f3e496c8722b2d590432bb3",
+                "value_type": "FLOAT"
+              },
+              {
+                "delay": "0",
+                "key": "vpndongle.vpn.rx[{#IF}]",
+                "master_item": {
+                  "key": "vpndongle.status"
+                },
+                "name": "VPN: empfangen",
+                "preprocessing": [
+                  {
+                    "parameters": [
+                      "$.rx"
+                    ],
+                    "type": "JSONPATH"
+                  },
+                  {
+                    "type": "CHANGE_PER_SECOND"
+                  },
+                  {
+                    "parameters": [
+                      "8"
+                    ],
+                    "type": "MULTIPLIER"
+                  }
+                ],
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "vpn"
+                  }
+                ],
+                "type": "DEPENDENT",
+                "units": "bps",
+                "uuid": "23607a6118ac4bd4ab2371c62514cfda",
+                "value_type": "FLOAT"
+              },
+              {
+                "delay": "0",
+                "key": "vpndongle.vpn.tx[{#IF}]",
+                "master_item": {
+                  "key": "vpndongle.status"
+                },
+                "name": "VPN: gesendet",
+                "preprocessing": [
+                  {
+                    "parameters": [
+                      "$.tx"
+                    ],
+                    "type": "JSONPATH"
+                  },
+                  {
+                    "type": "CHANGE_PER_SECOND"
+                  },
+                  {
+                    "parameters": [
+                      "8"
+                    ],
+                    "type": "MULTIPLIER"
+                  }
+                ],
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "vpn"
+                  }
+                ],
+                "type": "DEPENDENT",
+                "units": "bps",
+                "uuid": "8b1792886d724ad9a381c106f45b47a9",
+                "value_type": "FLOAT"
+              }
+            ],
+            "key": "vpndongle.discovery[vpn]",
+            "lifetime": "1d",
+            "name": "VPN-Tunnel",
+            "type": "ZABBIX_ACTIVE",
+            "uuid": "3a10f23ebcef4f0895c817959dc4b6e7"
+          },
+          {
+            "delay": "5m",
+            "description": "Liste „Weitere Ping-Ziele“ in der Weboberfläche.",
+            "item_prototypes": [
+              {
+                "key": "icmpping[{#TADDR},3]",
+                "name": "Ziel {#TNAME}: erreichbar",
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "target"
+                  }
+                ],
+                "trigger_prototypes": [
+                  {
+                    "expression": "max(/OpenStick-VPN-Dongle/icmpping[{#TADDR},3],#3)=0",
+                    "name": "{#TNAME} ({#TADDR}) nicht erreichbar",
+                    "priority": "AVERAGE",
+                    "uuid": "88e5a2201caf46f5a610d89bff5c5df8"
+                  }
+                ],
+                "type": "SIMPLE",
+                "uuid": "4afec36f571b4579aba500f52069752a",
+                "valuemap": {
+                  "name": "Service state"
+                }
+              },
+              {
+                "key": "icmppingloss[{#TADDR},3]",
+                "name": "Ziel {#TNAME}: Paketverlust",
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "target"
+                  }
+                ],
+                "trigger_prototypes": [
+                  {
+                    "expression": "min(/OpenStick-VPN-Dongle/icmppingloss[{#TADDR},3],5m)>{$VPNDONGLE.LOSS.WARN} and min(/OpenStick-VPN-Dongle/icmppingloss[{#TADDR},3],5m)<100",
+                    "name": "Ziel {#TNAME}: hoher Paketverlust",
+                    "priority": "WARNING",
+                    "uuid": "943218a25a334fc191c05e6f637a468a"
+                  }
+                ],
+                "type": "SIMPLE",
+                "units": "%",
+                "uuid": "1ae7744c4be642ed9ad66ddcbf48b949",
+                "value_type": "FLOAT"
+              },
+              {
+                "key": "icmppingsec[{#TADDR},3,,,,avg]",
+                "name": "Ziel {#TNAME}: Antwortzeit",
+                "tags": [
+                  {
+                    "tag": "component",
+                    "value": "target"
+                  }
+                ],
+                "trigger_prototypes": [
+                  {
+                    "expression": "avg(/OpenStick-VPN-Dongle/icmppingsec[{#TADDR},3,,,,avg],5m)>{$VPNDONGLE.RTT.WARN}",
+                    "name": "Ziel {#TNAME}: hohe Antwortzeit",
+                    "priority": "WARNING",
+                    "uuid": "d73bff56b8d546aa976d783260348645"
+                  }
+                ],
+                "type": "SIMPLE",
+                "units": "s",
+                "uuid": "a96485a406844b14a2be4184ca1a9645",
+                "value_type": "FLOAT"
+              }
+            ],
+            "key": "vpndongle.discovery[targets]",
+            "lifetime": "1d",
+            "name": "Weitere Ping-Ziele",
+            "type": "ZABBIX_ACTIVE",
+            "uuid": "50fb824c1cff4cca816106ae19acad61"
+          }
+        ],
+        "groups": [
+          {
+            "name": "Templates/Network devices"
+          }
+        ],
+        "items": [
+          {
+            "delay": "1m",
+            "description": "JSON von vpndongled; alle Dongle-Werte sind davon abhängige Items.",
+            "history": "0",
+            "key": "vpndongle.status",
+            "name": "Dongle: Status (Rohdaten)",
+            "tags": [
+              {
+                "tag": "component",
+                "value": "raw"
+              }
+            ],
+            "type": "ZABBIX_ACTIVE",
+            "uuid": "6a08c409d8ca4f9c9a7e4e6b87e6b0bd",
+            "value_type": "TEXT"
+          },
+          {
+            "delay": "0",
+            "key": "vpndongle.uplink.code",
+            "master_item": {
+              "key": "vpndongle.status"
+            },
+            "name": "Dongle: Uplink",
+            "preprocessing": [
+              {
+                "parameters": [
+                  "$.uplink_code"
+                ],
+                "type": "JSONPATH"
+              }
+            ],
+            "tags": [
+              {
+                "tag": "component",
+                "value": "network"
+              }
+            ],
+            "triggers": [
+              {
+                "description": "Der Agent auf dem Stick meldet nichts mehr (Stick aus, Tunnel/Proxy gestört).",
+                "expression": "nodata(/OpenStick-VPN-Dongle/vpndongle.uplink.code,{$VPNDONGLE.NODATA})=1",
+                "name": "Dongle: keine Daten seit {$VPNDONGLE.NODATA}",
+                "priority": "AVERAGE",
+                "uuid": "a0997b33d9e448c8a878fe93273cc712"
+              },
+              {
+                "description": "Weder WLAN noch LTE verbunden (Werte kommen verzögert über den Proxy-Puffer).",
+                "expression": "max(/OpenStick-VPN-Dongle/vpndongle.uplink.code,{$VPNDONGLE.UPLINK.DOWN})=0",
+                "name": "Dongle: kein Uplink seit {$VPNDONGLE.UPLINK.DOWN}",
+                "priority": "WARNING",
+                "uuid": "e6dcc09d28b24032b0a6150bea595290"
+              },
+              {
+                "description": "Kein WLAN – der Stick nutzt Mobilfunk (Datenvolumen).",
+                "expression": "last(/OpenStick-VPN-Dongle/vpndongle.uplink.code)=2",
+                "name": "Dongle: LTE-Rückfall aktiv",
+                "priority": "INFO",
+                "uuid": "cb1ee44933f14d219027f57bde21603b"
+              }
+            ],
+            "type": "DEPENDENT",
+            "uuid": "7a37d5e17ea34990b0407b46e544b07c",
+            "valuemap": {
+              "name": "VPN-Dongle Uplink"
+            }
+          },
+          {
+            "delay": "0",
+            "key": "vpndongle.locked",
+            "master_item": {
+              "key": "vpndongle.status"
+            },
+            "name": "Dongle: Internet gesperrt (Captive)",
+            "preprocessing": [
+              {
+                "parameters": [
+                  "$.locked"
+                ],
+                "type": "JSONPATH"
+              },
+              {
+                "type": "BOOL_TO_DECIMAL"
+              }
+            ],
+            "tags": [
+              {
+                "tag": "component",
+                "value": "network"
+              }
+            ],
+            "type": "DEPENDENT",
+            "uuid": "dd1f7829cae14559b923a834558cfd8b",
+            "valuemap": {
+              "name": "VPN-Dongle Ja/Nein"
+            }
+          },
+          {
+            "delay": "0",
+            "key": "vpndongle.version",
+            "master_item": {
+              "key": "vpndongle.status"
+            },
+            "name": "Dongle: Version",
+            "preprocessing": [
+              {
+                "parameters": [
+                  "$.version"
+                ],
+                "type": "JSONPATH"
+              },
+              {
+                "parameters": [
+                  "1d"
+                ],
+                "type": "DISCARD_UNCHANGED_HEARTBEAT"
+              }
+            ],
+            "tags": [
+              {
+                "tag": "component",
+                "value": "system"
+              }
+            ],
+            "type": "DEPENDENT",
+            "uuid": "231bc44633c9493db367fecbc3b9c1af",
+            "value_type": "CHAR"
+          },
+          {
+            "delay": "5m",
+            "key": "system.uptime",
+            "name": "Dongle: Laufzeit",
+            "tags": [
+              {
+                "tag": "component",
+                "value": "system"
+              }
+            ],
+            "triggers": [
+              {
+                "expression": "last(/OpenStick-VPN-Dongle/system.uptime)<10m",
+                "name": "Dongle: neu gestartet",
+                "priority": "INFO",
+                "uuid": "ad3c3f4ead1d4a06b0c5c56a7f5f3362"
+              }
+            ],
+            "type": "ZABBIX_ACTIVE",
+            "units": "uptime",
+            "uuid": "858ca2342ac24a9ea08c6c3bc8943a39"
+          },
+          {
+            "delay": "1m",
+            "key": "system.cpu.load[all,avg5]",
+            "name": "Dongle: CPU-Last (5 min)",
+            "tags": [
+              {
+                "tag": "component",
+                "value": "cpu"
+              }
+            ],
+            "type": "ZABBIX_ACTIVE",
+            "uuid": "e97605704c5e4f2cb7507c97825a0639",
+            "value_type": "FLOAT"
+          },
+          {
+            "delay": "1m",
+            "key": "vm.memory.size[pavailable]",
+            "name": "Dongle: RAM verfügbar",
+            "tags": [
+              {
+                "tag": "component",
+                "value": "memory"
+              }
+            ],
+            "triggers": [
+              {
+                "expression": "max(/OpenStick-VPN-Dongle/vm.memory.size[pavailable],5m)<{$VPNDONGLE.MEM.MIN}",
+                "name": "Dongle: wenig RAM (<{$VPNDONGLE.MEM.MIN}%)",
+                "priority": "AVERAGE",
+                "uuid": "5dc610d2c11348db95cb6e7b18abe366"
+              }
+            ],
+            "type": "ZABBIX_ACTIVE",
+            "units": "%",
+            "uuid": "14bf988b7eaf49929f8a0b6b5fbbc281",
+            "value_type": "FLOAT"
+          },
+          {
+            "delay": "5m",
+            "key": "vfs.fs.size[/,pfree]",
+            "name": "Dongle: Flash frei",
+            "tags": [
+              {
+                "tag": "component",
+                "value": "storage"
+              }
+            ],
+            "triggers": [
+              {
+                "expression": "last(/OpenStick-VPN-Dongle/vfs.fs.size[/,pfree])<{$VPNDONGLE.DISK.MIN}",
+                "name": "Dongle: wenig Flash frei (<{$VPNDONGLE.DISK.MIN}%)",
+                "priority": "AVERAGE",
+                "uuid": "be30f4691bb04b8c84bb089f990def6d"
+              }
+            ],
+            "type": "ZABBIX_ACTIVE",
+            "units": "%",
+            "uuid": "722f13a60e764e03821d219831cb0ab4",
+            "value_type": "FLOAT"
+          }
+        ],
+        "macros": [
+          {
+            "description": "Keine Daten vom Stick nach dieser Zeit.",
+            "macro": "{$VPNDONGLE.NODATA}",
+            "value": "5m"
+          },
+          {
+            "description": "Kein Uplink (WLAN/LTE) so lange -> Warnung.",
+            "macro": "{$VPNDONGLE.UPLINK.DOWN}",
+            "value": "10m"
+          },
+          {
+            "description": "Untergrenze freier RAM in %.",
+            "macro": "{$VPNDONGLE.MEM.MIN}",
+            "value": "10"
+          },
+          {
+            "description": "Untergrenze freier Flash in %.",
+            "macro": "{$VPNDONGLE.DISK.MIN}",
+            "value": "10"
+          },
+          {
+            "description": "WLAN getrennt so lange -> Warnung.",
+            "macro": "{$VPNDONGLE.WLAN.DOWN}",
+            "value": "10m"
+          },
+          {
+            "description": "WLAN-Signal (Mittel 15 min) unter diesem Wert in %.",
+            "macro": "{$VPNDONGLE.WLAN.SIGNAL.MIN}",
+            "value": "30"
+          },
+          {
+            "description": "LTE-Signal (Mittel 15 min) unter diesem Wert in %.",
+            "macro": "{$VPNDONGLE.LTE.SIGNAL.MIN}",
+            "value": "20"
+          },
+          {
+            "description": "Tunnel ohne Handshake so lange -> Alarm.",
+            "macro": "{$VPNDONGLE.VPN.DOWN}",
+            "value": "5m"
+          },
+          {
+            "description": "Paketverlust-Warnschwelle in %.",
+            "macro": "{$VPNDONGLE.LOSS.WARN}",
+            "value": "20"
+          },
+          {
+            "description": "Antwortzeit-Warnschwelle in s.",
+            "macro": "{$VPNDONGLE.RTT.WARN}",
+            "value": "0.3"
+          }
+        ],
+        "name": "OpenStick VPN-Dongle",
+        "tags": [
+          {
+            "tag": "class",
+            "value": "network"
+          },
+          {
+            "tag": "target",
+            "value": "vpndongle"
+          }
+        ],
+        "template": "OpenStick-VPN-Dongle",
+        "uuid": "9fba2be3fcb544e2a58c10123e8d6171",
+        "valuemaps": [
+          {
+            "mappings": [
+              {
+                "newvalue": "Down",
+                "value": "0"
+              },
+              {
+                "newvalue": "Up",
+                "value": "1"
+              }
+            ],
+            "name": "Service state",
+            "uuid": "1549ff596f6a4d4abcec67ccc4f581e5"
+          },
+          {
+            "mappings": [
+              {
+                "newvalue": "Nein",
+                "value": "0"
+              },
+              {
+                "newvalue": "Ja",
+                "value": "1"
+              }
+            ],
+            "name": "VPN-Dongle Ja/Nein",
+            "uuid": "4203a1a56ac54466b2b99cde5dbd2b40"
+          },
+          {
+            "mappings": [
+              {
+                "newvalue": "keiner",
+                "value": "0"
+              },
+              {
+                "newvalue": "WLAN",
+                "value": "1"
+              },
+              {
+                "newvalue": "LTE",
+                "value": "2"
+              }
+            ],
+            "name": "VPN-Dongle Uplink",
+            "uuid": "b784a255cb1449a39ac4619bb9d00a6d"
+          }
+        ],
+        "vendor": {
+          "name": "OPENSTICK-VPN-Dongle",
+          "version": "7.0-1"
+        }
+      }
+    ],
+    "version": "7.0"
+  }
+}

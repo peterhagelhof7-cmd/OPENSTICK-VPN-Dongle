@@ -1,0 +1,12 @@
+# Eigene dnsmasq-Instanz nur für usb0 (DHCP + DNS für den PC).
+# Wird von vpndongled geschrieben und (neu) gestartet – nicht selbst enablen.
+[Unit]
+Description=VPN-Dongle: DHCP/DNS für den PC (dnsmasq)
+After=vpndongle-gadget.service
+ConditionPathExists=/run/vpndongle/dnsmasq.conf
+
+[Service]
+ExecStartPre=/usr/sbin/dnsmasq --test --conf-file=/run/vpndongle/dnsmasq.conf
+ExecStart=/usr/sbin/dnsmasq --keep-in-foreground --conf-file=/run/vpndongle/dnsmasq.conf --pid-file=/run/vpndongle/dnsmasq.pid --dhcp-leasefile=/run/vpndongle/dnsmasq.leases
+Restart=on-failure
+RestartSec=2

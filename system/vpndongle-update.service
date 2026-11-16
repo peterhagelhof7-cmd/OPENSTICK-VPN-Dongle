@@ -1,0 +1,11 @@
+[Unit]
+Description=VPN-Dongle: Systemupdate (Debian, Zabbix, VPN-Dongle-Paket)
+After=network-online.target vpndongled.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/vpndongle/update.sh
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=1h

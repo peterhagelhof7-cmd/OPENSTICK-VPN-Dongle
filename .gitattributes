@@ -1,0 +1,6 @@
+* text=auto
+*.sh text eol=lf
+*.service text eol=lf
+system/*.conf text eol=lf
+*.ps1 text eol=crlf
+*.timer text eol=lf

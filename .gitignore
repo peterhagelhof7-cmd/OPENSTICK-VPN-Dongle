@@ -1,0 +1,25 @@
+# Build
+/bin/
+/dist/
+/dryrun-root/
+*.exe
+
+# Stick-Backups (IMEI, Kalibrierung) – NIE committen
+backup*/
+*.img
+*.mbn
+
+# Geheimnisse
+wg*.conf
+*.bhvpn
+!internal/config/testdata/*.bhvpn
+
+# heruntergeladene Fremd-Images (gross)
+image-kandidaten/
+
+# Signaturschluessel fuer Releases (liegen NUR beim Herausgeber)
+*.key
+release-signing*
+
+# Roh-Abbilder / Partitionen (eMMC-Dumps, Images)
+*.bin

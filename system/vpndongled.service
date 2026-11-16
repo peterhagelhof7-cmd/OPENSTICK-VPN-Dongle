@@ -1,0 +1,12 @@
+[Unit]
+Description=VPN-Dongle: Steuerdienst (Web-UI, WLAN/LTE, WireGuard, Firewall)
+After=vpndongle-gadget.service NetworkManager.service ModemManager.service nftables.service
+Wants=vpndongle-gadget.service NetworkManager.service ModemManager.service
+
+[Service]
+ExecStart=/usr/local/bin/vpndongled
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
