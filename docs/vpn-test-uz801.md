@@ -47,6 +47,46 @@ Damit ist der **WLAN-Empfang des Sticks** der Engpass (WCN3620: nur 2,4 GHz, ein
 (Stick sendet ins WLAN) sogar schneller. Die eigentliche VPN-Leistung des Sticks lässt sich erst über einen
 schnelleren Uplink messen (LTE, sobald eine SIM da ist).
 
+## NetBird (2026-11-16)
+
+Selbst gehostetes NetBird-Management (Dashboard/API/Management/Signal/Relay auf Port 443), Client 0.83.1,
+Anmeldung per Setup-Key über die Weboberfläche.
+
+| Test | Ergebnis |
+|---|---|
+| Anmeldung | ✅ `Connected`, Kernel-WireGuard auf `wt0`, Name `vpndongle-<SN>.netbird.selfhosted`; Setup-Key danach aus der Konfig gelöscht, Key-Datei weg |
+| Firewall | ✅ NetBird legt eigene iptables-Tabellen an (`ip filter/nat/mangle`): FORWARD lässt PC→`wt0` durch, verwirft nur neue Verbindungen *aus* `wt0`; INPUT aus `wt0` nur für Peers laut NetBird-Richtlinie – zusätzlich zur Zugriffs-Tabelle |
+| DNS des Sticks | ✅ NetBird biegt `/etc/resolv.conf` auf sich um; Auflösung funktioniert (Internet und `*.netbird.selfhosted`) |
+| PC → Peer | ✅ Option 121 liefert das Overlay-Netz; Ping 0 % (TTL 63), HTTP zu einem Peer-Dienst, Verbindung über Relay (Gast-WLAN) |
+| DNS am PC | ✅ `<peer>.netbird.selfhosted` über den Stick, normale Namen weiter über den Uplink |
+| Kill-Switch | ✅ ohne Exit-Node: Internet für den PC gesperrt, NetBird-Peers erreichbar; aus → Internet sofort wieder da |
+| Umschalten | ✅ NetBird → WireGuard (Dienst aus, `wt0` weg, WireGuard-Ziel erreichbar) → NetBird ohne neuen Setup-Key (schon angemeldet) |
+| Kosten | NetBird-Dienst 62 MB RAM verbunden; Statusabfrage ~0,1 s alle 5 s, Stick gesamt ~3,5 % CPU; RAM 113 von 317 MiB |
+
+Nicht getestet: Exit-Node (Volltunnel), Netze hinter einem Routing-Peer, SSH/Web auf den Stick aus dem NetBird-Netz.
+
+## Tailscale (2026-11-16)
+
+Tailscale-Cloud, Client 1.104.7, Anmeldung per Auth-Key über die Weboberfläche, VPN-Art „Tailscale“.
+
+| Test | Ergebnis |
+|---|---|
+| Anmeldung | ✅ `Running`/online, Name `vpndongle-<SN>.<tailnet>.ts.net`; Auth-Key danach aus der Konfig gelöscht, Key-Datei weg |
+| Umschalten | ✅ nur `tailscaled` läuft, NetBird und WireGuard aus |
+| Firewall | ✅ `--netfilter-mode=off`: Tailscale legt keine Tabellen an, unsere nftables bleiben maßgeblich |
+| DNS des Sticks | ✅ `--accept-dns=false`: `/etc/resolv.conf` unverändert |
+| Option 121 | ✅ PC bekommt `100.64.0.0/10` + Standardroute über den Stick |
+| MagicDNS am PC | ✅ `<gerät>.<tailnet>.ts.net` über den Stick → Tailscale-IP; normale Namen weiter über den Uplink |
+| Kill-Switch | ✅ ohne Exit-Node: Internet für den PC gesperrt; aus → sofort wieder da |
+| Stabilität | ✅ 60 s Beobachtung: Status konstant, keine Neustarts von dnsmasq |
+
+Nicht getestet (das Tailnet hatte außer dem Stick kein Gerät): Zugriff auf andere Geräte, Subnetz-Routen,
+Exit-Node.
+
+**Nebenbefund (unabhängig von der VPN-Art):** Beim Roaming zwischen zwei Access Points des Gast-WLANs
+startet NetworkManager DHCP neu; der DHCP-Server brauchte ~15–30 s – so lange kein Internet. Mögliche
+Verbesserung: Adresse beim Roaming behalten.
+
 ## Interner Speicher (eMMC) und USB-Strecke
 
 SMB gibt es auf dem Stick nicht (kein Samba im Image, unser Paket installiert keins). Dateien kommen über die

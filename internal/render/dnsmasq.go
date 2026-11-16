@@ -3,6 +3,7 @@ package render
 import (
 	"fmt"
 	"net/netip"
+	"regexp"
 	"strings"
 
 	"github.com/peterhagelhof7-cmd/OPENSTICK-VPN-Dongle/internal/config"
@@ -52,7 +53,11 @@ func Dnsmasq(n Net, c *config.Config, s State) string {
 		b.WriteString("# Captive-Portal: gesperrt\n")
 		p("address=/#/%s", n.DongleIP)
 		p("no-resolv")
-	case s.VPNOn && c.WG.FullTunnel:
+	case s.Ov && s.VPNOn && s.OvExit:
+		b.WriteString("# Overlay mit Exit-Node: alle Anfragen über den Resolver des Clients\n")
+		p("no-resolv")
+		p("server=%s", s.OvResolver)
+	case !s.Ov && s.VPNOn && c.WG.FullTunnel:
 		b.WriteString("# Volltunnel: DNS durch den Tunnel\n")
 		p("no-resolv")
 		for _, d := range strings.Split(c.WG.DNS, ",") {
@@ -62,15 +67,36 @@ func Dnsmasq(n Net, c *config.Config, s State) string {
 		}
 	default:
 		p("resolv-file=%s", NMResolv)
+		if s.Ov && s.VPNOn && reDomain.MatchString(s.OvDomain) {
+			b.WriteString("# Namen im Overlay-Netz über den Resolver des Clients\n")
+			p("server=/%s/%s", s.OvDomain, s.OvResolver)
+		}
 	}
 	return b.String()
 }
+
+// reDomain: nur harmlose DNS-Namen in die dnsmasq-Konfig übernehmen.
+var reDomain = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9-]{0,62}\.)*[A-Za-z0-9-]{1,63}$`)
 
 // pushRoutes: welche Routen der PC per Option 121 bekommt.
 // Ohne VPN: keine (PC nimmt Option 3 = Dongle als Default-Gateway).
 func pushRoutes(c *config.Config, s State) []netip.Prefix {
 	if s.Locked || !s.VPNOn {
 		return nil
+	}
+	if s.Ov {
+		if s.OvExit {
+			return []netip.Prefix{netip.MustParsePrefix("0.0.0.0/1"), netip.MustParsePrefix("128.0.0.0/1")}
+		}
+		var nets []netip.Prefix
+		if s.OvNet.IsValid() {
+			nets = append(nets, s.OvNet)
+		}
+		nets = append(nets, s.OvRoutes...)
+		if len(nets) == 0 {
+			return nil // noch nicht verbunden: Option 3 genügt
+		}
+		return append(nets, netip.MustParsePrefix("0.0.0.0/0"))
 	}
 	if c.WG.FullTunnel {
 		return []netip.Prefix{netip.MustParsePrefix("0.0.0.0/1"), netip.MustParsePrefix("128.0.0.0/1")}

@@ -17,23 +17,40 @@ type fakeSys struct {
 	files map[string]string
 	cmds  []string
 	out   map[string]string // Präfix des Befehls -> Ausgabe
+	fail  map[string]error  // Präfix des Befehls -> Fehler
+	hook  func(cmd string)  // läuft bei jedem Befehl (ohne Sperre)
 	stdin []string
 }
 
-func newFake() *fakeSys { return &fakeSys{files: map[string]string{}, out: map[string]string{}} }
+func newFake() *fakeSys {
+	return &fakeSys{files: map[string]string{}, out: map[string]string{}, fail: map[string]error{}}
+}
 
 func (f *fakeSys) DryRun() bool { return true }
 func (f *fakeSys) Run(name string, args ...string) (string, error) {
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	c := name + " " + strings.Join(args, " ")
 	f.cmds = append(f.cmds, c)
+	hook := f.hook
+	var out string
+	var err error
 	for p, o := range f.out {
 		if strings.HasPrefix(c, p) {
-			return o, nil
+			out = o
+			break
 		}
 	}
-	return "", nil
+	for p, e := range f.fail {
+		if strings.HasPrefix(c, p) {
+			err = e
+			break
+		}
+	}
+	f.mu.Unlock()
+	if hook != nil {
+		hook(c)
+	}
+	return out, err
 }
 func (f *fakeSys) RunInput(input, name string, args ...string) (string, error) {
 	f.mu.Lock()

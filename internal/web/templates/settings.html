@@ -49,7 +49,54 @@
 <label class="chk"><input type="checkbox" name="pin_clear"> gespeicherte PIN löschen</label>
 <button>Speichern</button></form></div>
 
+<div class="card"><h2>VPN-Art</h2>
+<form method="post" action="/settings/vpnkind">
+<select name="vpn">
+<option value="wireguard" {{if eq .Cfg.VPN "wireguard"}}selected{{end}}>WireGuard – fester Tunnel zu einem WireGuard-Server</option>
+<option value="netbird" {{if eq .Cfg.VPN "netbird"}}selected{{end}}>NetBird – Stick als Peer in einem NetBird-Netz</option>
+<option value="tailscale" {{if eq .Cfg.VPN "tailscale"}}selected{{end}}>Tailscale – Stick als Gerät in einem Tailnet (oder Headscale)</option>
+</select>
+<button>Übernehmen</button></form>
+<p class="mut" style="font-size:13px;margin-bottom:0">Immer nur eine VPN-Art ist aktiv. Bei NetBird und Tailscale regeln Gruppen/Richtlinien im Management, welche Ziele erreichbar sind; Routen und DNS kommen von dort und gehen per DHCP an den PC. Die Rechte gelten für den Stick – jeder PC am Stick bekommt sie.</p>
+<form method="post" action="/settings/vpn">{{if .Cfg.WG.VPNOff}}<input type="hidden" name="state" value="on"><button>VPN einschalten</button>{{else}}<input type="hidden" name="state" value="off"><button class="sec">VPN ausschalten</button>{{end}}</form>
+</div>
+
+<div class="card"><h2>NetBird</h2>
+{{if ne .Cfg.VPN "netbird"}}<p class="msg" style="margin:0 0 8px">Inaktiv – als VPN-Art ist nicht NetBird gewählt.</p>{{end}}
+<form method="post" action="/settings/netbird">
+<div class="grid">
+<div><label>Management-URL (leer = NetBird-Cloud)</label><input type="text" name="management" value="{{.Cfg.NetBird.Management}}" placeholder="https://api.netbird.io:443"></div>
+<div><label>Setup-Key (nur zur Anmeldung, leer = unverändert{{if .Cfg.NetBird.SetupKey}} – <b>Anmeldung ausstehend</b>{{end}})</label><input type="password" name="setup_key" autocomplete="off"></div>
+<div><label>Name im NetBird-Netz</label><input type="text" name="hostname" value="{{.Cfg.NetBird.Hostname}}" placeholder="{{.NBHost}}" maxlength="63"></div>
+<div></div>
+</div>
+<label class="chk"><input type="checkbox" name="killswitch" {{if .Cfg.NetBird.KillSwitch}}checked{{end}}> Kill-Switch (ohne NetBird-Verbindung kein Internet für den PC)</label>
+<button>Speichern</button></form>
+{{with .St.NetBird}}<div class="row"><span>Zustand</span><span>{{.Daemon}}{{if .Management}} · Management verbunden{{end}}</span></div>
+{{with .FQDN}}<div class="row"><span>Name</span><span><code>{{.}}</code></span></div>{{end}}
+{{with .IP}}<div class="row"><span>NetBird-IP</span><span><code>{{.}}</code></span></div>{{end}}
+<div class="row"><span>Routen vom Management</span><span>{{range .Networks}}<code>{{.}}</code> {{else}}<span class="mut">keine</span>{{end}}</span></div>{{end}}
+</div>
+
+<div class="card"><h2>Tailscale</h2>
+{{if ne .Cfg.VPN "tailscale"}}<p class="msg" style="margin:0 0 8px">Inaktiv – als VPN-Art ist nicht Tailscale gewählt.</p>{{end}}
+<form method="post" action="/settings/tailscale">
+<div class="grid">
+<div><label>Login-Server (leer = Tailscale-Cloud, sonst z. B. Headscale)</label><input type="text" name="login_server" value="{{.Cfg.Tailscale.LoginServer}}" placeholder="https://headscale.example.org"></div>
+<div><label>Auth-Key (nur zur Anmeldung, leer = unverändert{{if .Cfg.Tailscale.AuthKey}} – <b>Anmeldung ausstehend</b>{{end}})</label><input type="password" name="auth_key" autocomplete="off"></div>
+<div><label>Name im Tailnet</label><input type="text" name="hostname" value="{{.Cfg.Tailscale.Hostname}}" placeholder="{{.NBHost}}" maxlength="63"></div>
+<div><label>Exit-Node (Tailscale-IP oder Name; leer = kein Volltunnel)</label><input type="text" name="exit_node" value="{{.Cfg.Tailscale.ExitNode}}"></div>
+</div>
+<label class="chk"><input type="checkbox" name="killswitch" {{if .Cfg.Tailscale.KillSwitch}}checked{{end}}> Kill-Switch (ohne Tailscale-Verbindung kein Internet für den PC)</label>
+<button>Speichern</button></form>
+{{with .St.Tailscale}}<div class="row"><span>Zustand</span><span>{{.Backend}}{{if .Online}} · online{{end}}{{range .Health}} · <span class="warn">{{.}}</span>{{end}}</span></div>
+{{with .DNSName}}<div class="row"><span>Name</span><span><code>{{.}}</code></span></div>{{end}}
+{{with .IP}}<div class="row"><span>Tailscale-IP</span><span><code>{{.}}</code></span></div>{{end}}
+<div class="row"><span>Subnetz-Routen</span><span>{{range .Routes}}<code>{{.}}</code> {{else}}<span class="mut">keine</span>{{end}}</span></div>{{end}}
+</div>
+
 <div class="card"><h2>WireGuard</h2>
+{{if ne .Cfg.VPN "wireguard"}}<p class="msg" style="margin:0 0 8px">Inaktiv – als VPN-Art ist nicht WireGuard gewählt.</p>{{end}}
 <form method="post" action="/settings/wg">
 <div class="grid">
 <div><label>Private Key (leer = unverändert{{if .Cfg.WG.Priv}}, gesetzt{{end}})</label><input type="password" name="priv" autocomplete="off"></div>
@@ -68,7 +115,6 @@
 <label class="chk"><input type="checkbox" name="killswitch" {{if .Cfg.WG.KillSwitch}}checked{{end}}> Kill-Switch (ohne Tunnel kein Internet)</label>
 <label class="chk"><input type="checkbox" name="psk_clear"> Preshared Key entfernen</label>
 <button>Speichern</button></form>
-<form method="post" action="/settings/vpn">{{if .Cfg.WG.VPNOff}}<input type="hidden" name="state" value="on"><button>VPN einschalten</button>{{else}}<input type="hidden" name="state" value="off"><button class="sec">VPN ausschalten</button>{{end}}</form>
 </div>
 
 <div class="card"><h2>Ressourcen &amp; Dateien</h2>

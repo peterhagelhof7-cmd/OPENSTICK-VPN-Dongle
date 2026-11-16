@@ -79,6 +79,32 @@ if [ "$zbx_fresh" = 1 ]; then
 	systemctl disable --now zabbix-proxy zabbix-agent 2>/dev/null || true
 fi
 install -d -o zabbix -g zabbix -m 0750 /var/lib/zabbix
+
+say "NetBird-Client"
+if ! dpkg -s netbird >/dev/null 2>&1; then
+	wget -q -O /usr/share/keyrings/netbird-archive-keyring.asc https://pkgs.netbird.io/debian/public.key
+	echo 'deb [signed-by=/usr/share/keyrings/netbird-archive-keyring.asc] https://pkgs.netbird.io/debian stable main' \
+		>/etc/apt/sources.list.d/netbird.list
+	apt-get update
+	DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends netbird
+	# Das Paket startet den Dienst sofort; vpndongled schaltet ihn nur ein,
+	# wenn in der Weboberfläche NetBird als VPN-Art gewählt ist
+	systemctl disable --now netbird 2>/dev/null || true
+fi
+echo "NetBird $(netbird version 2>/dev/null || echo fehlt)"
+
+say "Tailscale-Client"
+if ! dpkg -s tailscale >/dev/null 2>&1; then
+	wget -q -O /usr/share/keyrings/tailscale-archive-keyring.gpg \
+		"https://pkgs.tailscale.com/stable/debian/${VERSION_CODENAME}.noarmor.gpg"
+	wget -q -O /etc/apt/sources.list.d/tailscale.list \
+		"https://pkgs.tailscale.com/stable/debian/${VERSION_CODENAME}.tailscale-keyring.list"
+	apt-get update
+	DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tailscale
+	# wie NetBird: nur an, wenn Tailscale als VPN-Art gewählt ist
+	systemctl disable --now tailscaled 2>/dev/null || true
+fi
+echo "Tailscale $(tailscale version 2>/dev/null | head -n 1 || echo fehlt)"
 # Paket-Cache (.deb-Dateien) vom Flash entfernen
 apt-get clean
 

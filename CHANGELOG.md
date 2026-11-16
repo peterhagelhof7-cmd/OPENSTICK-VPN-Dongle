@@ -1,5 +1,20 @@
 # Änderungen
 
+## v0.2.0
+
+Zero-Trust-Netze: der Stick als Hardware-Client für NetBird und Tailscale/Headscale.
+
+
+- **NetBird** als zweite VPN-Art neben WireGuard: Anmeldung per Setup-Key (danach gelöscht, nie auf
+  der Kommandozeile), Routen/DNS/Exit-Node aus dem Management per Option 121 an den PC,
+  NetBird-Namen über den lokalen NetBird-Resolver, Kill-Switch/Isolation/Zugriffs-Tabelle auf `wt0`,
+  Client läuft nur, wenn NetBird gewählt ist
+- **Tailscale** (Tailscale-Cloud oder Headscale) als dritte VPN-Art: Auth-Key (danach gelöscht),
+  Subnetz-Routen und MagicDNS an den PC, Exit-Node als Volltunnel, `--netfilter-mode=off`
+- **VPN-Art** als Auswahl (WireGuard | NetBird | Tailscale); VPN-Schalter gilt für alle
+- Status: **Temperatur** (CPU, Modem, Drosselgrenze; alle Fühler in `status.json`)
+- Fix: CPU/RAM-Auslastung fehlte bei NetBird/Tailscale in der Status-Karte
+
 ## v0.1.0
 
 Erste öffentliche Version, getestet auf einem UZ801 (FY_UZ801_V3.31) mit Debian 13 (openstick-installer v0.0.5).

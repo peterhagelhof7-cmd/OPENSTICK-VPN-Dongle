@@ -2,15 +2,17 @@
 
 **Plug-and-Play-VPN-Gateway auf einem 10-€-LTE-Stick.** Ein UZ801-USB-Stick (Qualcomm MSM8916) mit
 Debian wird zum USB-Netzwerkadapter: PC einstecken, der Stick bringt ihn über WLAN oder LTE ins Internet
-und auf Wunsch per **WireGuard** ins Firmen- oder Heimnetz – ohne Treiber, ohne Software auf dem PC.
+und auf Wunsch per **WireGuard**, **NetBird** oder **Tailscale** ins Firmen- oder Heimnetz – ohne Treiber,
+ohne Software auf dem PC.
 
 > *English:* Turns a cheap UZ801 4G USB stick (MSM8916, OpenStick Debian) into a driverless USB network
-> adapter that routes the PC through Wi-Fi or LTE and an optional WireGuard tunnel (kill switch, captive
-> portal, web UI, Zabbix proxy, signed self-updates). Documentation is in German.
+> adapter that routes the PC through Wi-Fi or LTE and an optional WireGuard, NetBird or Tailscale/Headscale
+> connection – a hardware client for zero-trust networks (kill switch, captive portal, web UI, Zabbix proxy,
+> signed self-updates). Documentation is in German.
 
 ```
  PC ──USB (NCM, ohne Treiber)──► UZ801 ──WLAN / LTE──► Internet
-       192.168.226.2               │  └── WireGuard (Kernel) ──► Heim-/Firmennetz
+       192.168.226.2               │  └── WireGuard / NetBird / Tailscale ──► Heim-/Firmennetz
                                    └── Weboberfläche http://192.168.226.1/
 ```
 
@@ -22,8 +24,10 @@ ESP-Kern, dazu **LTE** als zweiter Internet-Zugang.
 
 Läuft auf einem echten **UZ801 (Platine FY_UZ801_V3.31)** mit dem Debian-13-Image des
 [openstick-installer](https://github.com/Basistiy/openstick-installer). Getestet: Backup/Flash,
-USB-Netz unter Windows 11, WLAN, WireGuard (Split und Volltunnel), Kill-Switch, Option 121,
-Selbst-Update-Prüfung. Noch offen: LTE (keine SIM im Test), macOS/iPadOS am UZ801, LED-Anzeige.
+USB-Netz unter Windows 11, WLAN, WireGuard (Split und Volltunnel), NetBird (eigener Server: Anmeldung,
+Peers, DNS, Kill-Switch), Tailscale (Cloud: Anmeldung, MagicDNS, Kill-Switch), Option 121, signiertes
+Selbst-Update. Noch offen: LTE (keine SIM im Test), Tailscale-Subnetz-Routen/Exit-Node, macOS/iPadOS am
+UZ801, LED-Anzeige.
 
 Messwerte (Details in [docs/vpn-test-uz801.md](docs/vpn-test-uz801.md)):
 
@@ -43,14 +47,26 @@ Der Engpass ist das 2,4-GHz-WLAN des Sticks (WCN3620, ~4–7 Mbit/s), nicht CPU 
 | Uplink | bis 10 WLANs mit Priorität, **LTE als Rückfall** (oder nur WLAN / nur LTE) |
 | DHCP/DNS | eigene dnsmasq-Instanz nur auf usb0, Routen per **Option 121** (kein Eingriff am PC) |
 | WireGuard | Kernel-WireGuard, Voll- oder Split-Tunnel (zusätzliche Netze möglich), VPN-Schalter |
+| NetBird / Tailscale | alternativ zu WireGuard (VPN-Art wählbar): Stick als Peer in einem [NetBird](https://netbird.io)-Netz oder als Gerät in einem [Tailscale](https://tailscale.com)-Tailnet bzw. bei Headscale – Zugriffe per Gruppen/Richtlinien im Management, Routen/DNS/Exit-Node von dort, Anmeldung per Setup-/Auth-Key |
 | Sicherheit | Kill-Switch, LAN-Isolation, Captive-Portal ohne Uplink, Basic-Auth, CSRF-Bremse |
 | Zugriff auf den Stick | **Haken-Tabelle** Weboberfläche/SSH/Ping × USB/VPN/WLAN/LTE (Firewall) |
-| Status | Uplink, WLAN-Signal, LTE, VPN-Handshake, **CPU/RAM gemittelt über 60 s** |
+| Status | Uplink, WLAN-Signal, LTE, VPN, **CPU/RAM gemittelt über 60 s**, **Temperatur** (CPU/Modem, Drosselgrenze); alles auch als `status.json` |
 | Ressourcen | RDP-Dateien, Links, SSH, Datei-Downloads vom Stick |
 | Konfig | Export/Import verschlüsselt (BHVPN1, kompatibel zum ESP und zu `tools/admin.ps1`), Config-Server |
 | Zabbix 7.0 | aktiver Proxy + Agent durch den Tunnel ([docs/zabbix.md](docs/zabbix.md), Vorlage in `zabbix/`) |
 | Updates | Debian/Zabbix wöchentlich oder per Knopf; **Selbst-Update aus GitHub-Releases mit Ed25519-Signatur** |
 | Härtung des Images | neue machine-id und SSH-Host-Schlüssel, Image-Konten/Hotspot/Gadget aus ([system/harden-base.sh](system/harden-base.sh)) |
+
+## Zero Trust (NetBird / Tailscale)
+
+Mit NetBird oder Tailscale wird der Stick zum **Hardware-Client für ein Zero-Trust-Netz**: Er meldet sich
+mit eigener Identität (Setup-/Auth-Key) an, welche Ziele erreichbar sind, regeln Gruppen bzw. ACLs zentral
+im Management – nicht IP-Bereiche in einer Konfigdatei. Routen, DNS und Exit-Node kommen von dort; der PC
+braucht weiterhin keinen Client.
+
+Ehrlich eingeordnet: Die Zero-Trust-Eigenschaften liefert die jeweilige Plattform. Die Richtlinien gelten
+für die **Identität des Sticks** – jeder PC am Stick erbt dessen Rechte, Posture-Checks prüfen den Stick,
+nicht den PC. Deshalb: Dongles in eine eigene Gruppe mit minimalen Rechten, Kill-Switch und LAN-Isolation an.
 
 ## Loslegen
 
@@ -119,6 +135,8 @@ Dieses Repository enthält **nur eigenen Code**. Folgendes wird benutzt, aber **
 | Qualcomm-Firmware (sbl1, tz, rpm, Modem, WLAN) | proprietär | stammt aus Image bzw. eigenem Backup – **nie weitergeben** |
 | [bkerler/edl](https://github.com/bkerler/edl) | GPL-3.0 | EDL-Werkzeug, von `flash.ps1` aufgerufen |
 | Zabbix Proxy/Agent | AGPL-3.0 | aus dem offiziellen Zabbix-Repository auf dem Stick installiert |
+| NetBird-Client | BSD-3-Clause | aus dem offiziellen NetBird-Repository auf dem Stick installiert |
+| Tailscale-Client | BSD-3-Clause | aus dem offiziellen Tailscale-Repository auf dem Stick installiert |
 | Go-Standardbibliothek | BSD-3-Clause | steckt in `vpndongled`; Hinweis in `THIRD_PARTY_NOTICES` jedes Pakets |
 
 Backups und Images enthalten gerätespezifische Daten (IMEI, Kalibrierung) und proprietäre Firmware;

@@ -1,6 +1,7 @@
 package render
 
 import (
+	"net/netip"
 	"os"
 	"path/filepath"
 	"testing"
@@ -46,6 +47,20 @@ func TestWriteSamples(t *testing.T) {
 			all := []string{config.NetUSB, config.NetVPN, config.NetWLAN, config.NetLTE}
 			c.Access = config.Access{config.SvcWeb: all, config.SvcSSH: all, config.SvcPing: all}
 		}, State{VPNOn: true}},
+		{"netbird-split-ks", func(c *config.Config) {
+			c.VPN, c.NetBird = config.VPNNetBird, config.NetBird{KillSwitch: true}
+		}, State{Ov: true, OvIface: "wt0", OvResolver: NBResolverDNS, VPNOn: true, OvNet: netip.MustParsePrefix("100.92.0.0/16"),
+			OvRoutes: []netip.Prefix{netip.MustParsePrefix("10.10.0.0/24")}, OvDomain: "netbird.selfhosted"}},
+		{"netbird-exit", func(c *config.Config) {
+			c.VPN = config.VPNNetBird
+		}, State{Ov: true, OvIface: "wt0", OvResolver: NBResolverDNS, VPNOn: true, OvExit: true, OvNet: netip.MustParsePrefix("100.92.0.0/16"), OvDomain: "netbird.selfhosted"}},
+		{"tailscale-exit-ks", func(c *config.Config) {
+			c.VPN, c.Tailscale = config.VPNTailscale, config.Tailscale{KillSwitch: true, ExitNode: "100.80.1.2"}
+		}, State{Ov: true, OvIface: "tailscale0", OvResolver: TSResolverDNS, VPNOn: true, OvExit: true,
+			OvNet: netip.MustParsePrefix("100.64.0.0/10"), OvDomain: "tail1234.ts.net"}},
+		{"tailscale-split", func(c *config.Config) { c.VPN = config.VPNTailscale }, State{Ov: true, OvIface: "tailscale0",
+			OvResolver: TSResolverDNS, VPNOn: true, OvNet: netip.MustParsePrefix("100.64.0.0/10"),
+			OvRoutes: []netip.Prefix{netip.MustParsePrefix("192.168.50.0/24")}, OvDomain: "tail1234.ts.net"}},
 		{"zugriff-nichts", func(c *config.Config) {
 			c.Access = config.Access{config.SvcWeb: {config.NetUSB}, config.SvcSSH: {}, config.SvcPing: {}}
 		}, State{}},

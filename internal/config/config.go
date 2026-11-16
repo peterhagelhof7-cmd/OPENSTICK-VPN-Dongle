@@ -99,6 +99,68 @@ type Update struct {
 	GitHub     bool `json:"github"`      // VPN-Dongle-Software aus signierten GitHub-Releases
 }
 
+// VPN-Arten (immer nur eine aktiv). Der VPN-Schalter (WG.VPNOff) gilt für alle.
+const (
+	VPNWireGuard = "wireguard"
+	VPNNetBird   = "netbird"
+	VPNTailscale = "tailscale"
+)
+
+// NetBird: Stick als Peer in einem NetBird-Netz.
+type NetBird struct {
+	Management string `json:"management"` // leer = NetBird-Cloud (https://api.netbird.io:443)
+	SetupKey   string `json:"setup_key"`  // nur bis zur erfolgreichen Anmeldung gespeichert
+	Hostname   string `json:"hostname"`   // leer = vpndongle-<SN>
+	KillSwitch bool   `json:"killswitch"` // ohne NetBird-Verbindung kein Internet für den PC
+}
+
+// Tailscale: Stick als Gerät in einem Tailnet (Tailscale-Cloud oder Headscale).
+type Tailscale struct {
+	LoginServer string `json:"login_server"` // leer = Tailscale-Cloud; sonst z. B. Headscale
+	AuthKey     string `json:"auth_key"`     // nur bis zur erfolgreichen Anmeldung gespeichert
+	Hostname    string `json:"hostname"`     // leer = vpndongle-<SN>
+	ExitNode    string `json:"exit_node"`    // Tailscale-IP oder Name; leer = kein Volltunnel
+	KillSwitch  bool   `json:"killswitch"`
+}
+
+// NBDefaultManagement: Management der NetBird-Cloud.
+const NBDefaultManagement = "https://api.netbird.io:443"
+
+// NBManagement liefert die wirksame Management-URL.
+func (c *Config) NBManagement() string {
+	if c.NetBird.Management == "" {
+		return NBDefaultManagement
+	}
+	return c.NetBird.Management
+}
+
+// VPNKind liefert die gewählte VPN-Art (Standard WireGuard).
+func (c *Config) VPNKind() string {
+	switch c.VPN {
+	case VPNNetBird, VPNTailscale:
+		return c.VPN
+	}
+	return VPNWireGuard
+}
+
+// NBWanted / TSWanted / WGWanted: soll diese VPN-Art laufen?
+func (c *Config) NBWanted() bool { return c.VPNKind() == VPNNetBird && !c.WG.VPNOff }
+func (c *Config) TSWanted() bool { return c.VPNKind() == VPNTailscale && !c.WG.VPNOff }
+func (c *Config) WGWanted() bool {
+	return c.VPNKind() == VPNWireGuard && c.WGConfigured() && !c.WG.VPNOff
+}
+
+// KillSwitchOn: Kill-Switch der gewählten VPN-Art.
+func (c *Config) KillSwitchOn() bool {
+	switch c.VPNKind() {
+	case VPNNetBird:
+		return c.NetBird.KillSwitch
+	case VPNTailscale:
+		return c.Tailscale.KillSwitch
+	}
+	return c.WG.KillSwitch
+}
+
 type Admin struct {
 	User  string `json:"user"`
 	PHash string `json:"phash"` // SHA-256-Hex des Passworts (wie ESP)
@@ -114,7 +176,10 @@ type Config struct {
 	Uplink      string     `json:"uplink"`
 	Isolate     bool       `json:"isolate"` // PC darf nicht ins lokale Netz am Uplink
 	WLANs       []WLAN     `json:"wlans"`
+	VPN         string     `json:"vpn"` // VPN-Art: wireguard | netbird | tailscale
 	WG          WireGuard  `json:"wg"`
+	NetBird     NetBird    `json:"netbird"`
+	Tailscale   Tailscale  `json:"tailscale"`
 	LTE         LTE        `json:"lte"`
 	Admin       Admin      `json:"admin"`
 	Resources   []Resource `json:"resources"`
@@ -136,6 +201,7 @@ func Default() *Config {
 		SystemName:  "OpenStick-VPN",
 		CaptiveAuto: true,
 		Unlocked:    true,
+		VPN:         VPNWireGuard,
 		Uplink:      UplinkAuto,
 		Isolate:     true,
 		WG: WireGuard{
@@ -214,6 +280,7 @@ func (c *Config) Normalize() {
 	if len(c.Zabbix.Targets) > MaxZbxTargets {
 		c.Zabbix.Targets = c.Zabbix.Targets[:MaxZbxTargets]
 	}
+	c.VPN = c.VPNKind()
 	// nach Admin (Schutzregel hängt am Passwort)
 	c.Access = normalizeAccess(c.Access, c.DefaultPassword())
 }

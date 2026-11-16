@@ -79,6 +79,31 @@ func TestAccessKVRoundTrip(t *testing.T) {
 	}
 }
 
+func TestVPNKindKV(t *testing.T) {
+	c := Default()
+	if c.VPNKind() != VPNWireGuard || c.TSWanted() || c.NBWanted() {
+		t.Fatal("Standard muss WireGuard sein")
+	}
+	c.VPN, c.Tailscale = VPNTailscale, Tailscale{LoginServer: "https://hs.example.org", ExitNode: "100.80.1.2", KillSwitch: true}
+	kv := ExportKV(c, "SN")
+	d := Default()
+	if err := ImportKV(d, kv); err != nil {
+		t.Fatal(err)
+	}
+	if d.VPNKind() != VPNTailscale || d.Tailscale != c.Tailscale || !d.KillSwitchOn() {
+		t.Fatalf("Round-Trip: %s %+v", d.VPN, d.Tailscale)
+	}
+	d.WG.VPNOff = true
+	if d.TSWanted() {
+		t.Fatal("VPN-Schalter AUS muss auch Tailscale abschalten")
+	}
+	// unbekannte VPN-Art -> WireGuard
+	_ = ImportKV(d, "vpn.kind=openvpn\n")
+	if d.VPN != VPNWireGuard {
+		t.Fatalf("unbekannte Art: %q", d.VPN)
+	}
+}
+
 func TestAccessOldConfigFile(t *testing.T) {
 	// config.json von vor der Haken-Tabelle (kein "access") -> Standards
 	p := filepath.Join(t.TempDir(), "c.json")

@@ -112,7 +112,9 @@ Paket `vpndongle-<version>.tar.gz` aus den [Releases](https://github.com/peterha
 
 oder von Hand: Paket nach `/root` kopieren, entpacken, `sh install.sh` als root.
 
-`install.sh` installiert die Pakete (u. a. Zabbix 7.0), setzt die Zeitzone `Europe/Berlin` und
+`install.sh` installiert die Pakete (u. a. Zabbix 7.0 sowie die Clients von NetBird und Tailscale aus
+deren offiziellen Repositorys – die laufen nur, wenn sie als VPN-Art gewählt sind), setzt die Zeitzone
+`Europe/Berlin` und
 **härtet das Image** (`system/harden-base.sh`): neue machine-id und SSH-Host-Schlüssel, leeres
 root-Passwort gesperrt, Benutzer `user` gesperrt (nur wenn root ein Passwort oder einen Schlüssel hat),
 Hotspot-, LTE- und USB-Profile des Images weggeräumt, Image-Gadget und `hostapd` maskiert.
@@ -138,8 +140,10 @@ Weboberfläche: **`http://192.168.226.1/`**. Die Übersicht ist ohne Login errei
 verbinden, Ressourcen, Dateien), die **Einstellungen** brauchen den Admin-Login – ab Werk `admin`/`admin`,
 **sofort ändern** (Einstellungen → Zugang).
 
-**Status:** Uplink, WLAN mit Signal, LTE, VPN mit letztem Handshake und Datenmenge, CPU- und
-RAM-Auslastung (Mittel über 60 s). Maschinenlesbar unter `/status.json`.
+**Status:** Uplink, WLAN mit Signal, LTE, VPN (WireGuard: letzter Handshake und Datenmenge;
+NetBird/Tailscale: verbunden, Overlay-IP, Peers, Exit-Node), CPU- und RAM-Auslastung (Mittel über 60 s),
+Temperatur von CPU und Modem mit Drosselgrenze (orange ab 10 °C darunter, rot ab der Grenze).
+Maschinenlesbar unter `/status.json` (dort alle Temperaturfühler einzeln).
 
 **WLAN:** auf der Übersicht suchen und verbinden. Bis zu 10 Netze, die Reihenfolge ist die Priorität.
 Ohne Uplink sperrt das Captive-Portal das Internet und leitet auf die WLAN-Seite um.
@@ -163,6 +167,36 @@ eines Antworten.
 Routen kommen per DHCP Option 121 auf den PC: Split = Tunnel-Netz + Standardroute über den Dongle,
 Volltunnel = `0.0.0.0/1` + `128.0.0.0/1` (schlägt jede andere Standardroute). **Kill-Switch**: ohne
 Tunnel kein Internet für den PC. **VPN-Schalter**: Tunnel aus, Konfiguration bleibt.
+
+**VPN-Art** (Einstellungen → VPN-Art): WireGuard, NetBird oder Tailscale – immer nur eine ist aktiv,
+die anderen Clients laufen dann gar nicht. Der VPN-Schalter dort gilt für alle drei.
+
+**NetBird** (Einstellungen → NetBird):
+
+1. Im NetBird-Management (eigener Server oder app.netbird.io) eine Gruppe für Dongles anlegen, z. B.
+   `dongles`, und einen **Setup-Key** erzeugen, der Peers automatisch in diese Gruppe legt.
+2. Richtlinien: `dongles` darf nur die Ziele erreichen, die die PCs am Stick brauchen
+   (z. B. ein Netz über einen Routing-Peer). Für Volltunnel einen Exit-Node für die Gruppe freigeben.
+3. Am Stick: Management-URL (leer = NetBird-Cloud), Setup-Key, optional Name
+   (Standard `vpndongle-<Seriennummer>`), Kill-Switch; dann VPN-Art „NetBird“.
+
+Der Setup-Key wird nur zur Anmeldung benutzt und danach aus der Konfiguration gelöscht; er steht nie
+auf der Kommandozeile. Routen und der Exit-Node kommen vom Management und gehen per Option 121 an den
+PC; NetBird-Namen (`<peer>.<zone>`) löst der PC über den Stick auf. Der Stick routet nicht für andere
+Peers. **Wichtig:** Die Richtlinien gelten für den Stick – jeder PC am Stick bekommt dessen Rechte.
+Darum der Gruppe nur das Nötigste erlauben.
+
+**Tailscale** (Einstellungen → Tailscale) – Tailscale-Cloud oder eigener Headscale-Server:
+
+1. Im Admin-Panel einen **Auth-Key** erzeugen (am besten mit Tag, z. B. `tag:dongle`, und
+   passender ACL, die nur die nötigen Ziele erlaubt). Bei Headscale: `headscale preauthkeys create`.
+2. Am Stick: Login-Server (leer = Tailscale-Cloud), Auth-Key, optional Name und Exit-Node
+   (Tailscale-IP oder Gerätename – dann Volltunnel), Kill-Switch; dann VPN-Art „Tailscale“.
+
+Subnetz-Routen anderer Geräte werden übernommen (`--accept-routes`) und per Option 121 an den PC
+gegeben; MagicDNS-Namen löst der PC über den Stick auf. Der Stick lässt Tailscale nicht an der
+Firewall drehen (`--netfilter-mode=off`) – die Tailnet-ACLs setzt der Client selbst durch, die
+Zugriffs-Tabelle des Sticks gilt zusätzlich.
 
 **LTE:** APN, ggf. PIN und Roaming. „Uplink: Automatisch“ schaltet LTE zu, wenn 20 s kein WLAN da ist,
 und wieder ab, wenn das WLAN 60 s stabil ist.
@@ -218,6 +252,10 @@ Einstellungen (abgeleitet aus der machine-id, gleich der USB-Seriennummer).
 | „Unbekanntes USB-Gerät“ (Code 43) | abziehen, 15 s warten, direkt am Rechner einstecken; schwacher Hub? |
 | WLAN langsam | WCN3620 kann nur 2,4 GHz; ~4–7 Mbit/s sind normal |
 | VPN „verbindet …“ ohne Daten | gleicher Schlüssel auf einem zweiten Gerät aktiv? Endpoint/Port erreichbar? |
+| NetBird „NeedsLogin“ / Tailscale „NeedsLogin“ | Setup-/Auth-Key abgelaufen oder schon verbraucht – neuen Key eintragen |
+| NetBird/Tailscale verbunden, Ziel nicht erreichbar | Richtlinie/ACL im Management erlaubt der Gruppe des Sticks das Ziel nicht |
+| Kurz kein Internet im WLAN mit mehreren Access Points | Roaming: nach dem AP-Wechsel holt der Stick per DHCP neu eine Adresse (in Gast-WLANs teils 15–30 s) |
+| Temperatur orange/rot | Belüftung; ab der Drosselgrenze taktet die CPU herunter |
 | Updates laufen nicht | Uplink LTE ohne Freigabe? Update-Protokoll prüfen |
 
 **Kein Zugang mehr:** Der UZ801 hat keine Taste für fastboot/EDL. Dann Gehäuse öffnen, den

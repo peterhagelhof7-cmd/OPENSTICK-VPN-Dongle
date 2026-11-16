@@ -51,6 +51,16 @@ func New(a *app.App) *Server {
 		},
 		"add": func(a, b int) int { return a + b },
 		"kib": func(kb int64) string { return humanBytes(kb * 1024) },
+		// Farbe der Temperatur: rot ab Drosselgrenze, orange 10 °C darunter
+		"tempcls": func(t, throttle float64) string {
+			switch {
+			case throttle > 0 && t >= throttle:
+				return "bad"
+			case throttle > 0 && t >= throttle-10:
+				return "warn"
+			}
+			return ""
+		},
 		// Prozent für Text und Balkenbreite: ganzzahlig, 0..100
 		"pct": func(f float64) int {
 			switch {
@@ -99,6 +109,9 @@ func (s *Server) Handler() http.Handler {
 	a("POST /settings/wg", s.postWG)
 	a("POST /settings/vpn", s.postVPN)
 	a("POST /settings/access", s.postAccess)
+	a("POST /settings/netbird", s.postNetBird)
+	a("POST /settings/tailscale", s.postTailscale)
+	a("POST /settings/vpnkind", s.postVPNKind)
 	a("POST /settings/lte", s.postLTE)
 	a("POST /settings/wlanup", s.postWLANUp)
 	a("POST /settings/wlandel", s.postWLANDel)
@@ -275,6 +288,7 @@ type pageData struct {
 	// Haken-Tabelle „Zugriff auf den Stick“
 	AccessCols []accessCol
 	AccessRows []accessRow
+	NBHost     string // Standardname im NetBird-Netz
 }
 
 func (s *Server) data(r *http.Request, settings bool) pageData {
@@ -290,6 +304,7 @@ func (s *Server) data(r *http.Request, settings bool) pageData {
 		d.ZbxWarn = zbxTunnelWarning(d.Cfg)
 		d.Services = s.App.ServiceStates()
 		d.AccessCols, d.AccessRows = accessTable(d.Cfg)
+		d.NBHost = "vpndongle-" + strings.ToLower(d.Serial)
 	}
 	entries, _ := os.ReadDir(s.App.FilesDirReal())
 	for _, e := range entries {

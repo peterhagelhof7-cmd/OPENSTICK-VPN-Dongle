@@ -378,6 +378,24 @@ func TestStatusShowsLoad(t *testing.T) {
 	}
 }
 
+// Die Auslastung gehört zu jeder VPN-Art (war bei NetBird/Tailscale im WireGuard-Zweig verschwunden).
+func TestStatusLoadForEveryVPNKind(t *testing.T) {
+	for _, kind := range []string{"wireguard", "netbird", "tailscale"} {
+		a, h := setup(t)
+		_ = a.Update(func(c *config.Config) error { c.VPN = kind; return nil })
+		for _, page := range []string{"/", "/settings"} {
+			body := do(h, "GET", page, nil, true).Body.String()
+			if !strings.Contains(body, "Auslastung") {
+				t.Errorf("VPN-Art %s, Seite %s: Auslastung fehlt", kind, page)
+			}
+			// vor dem ersten Tick keine Temperatur (kein „-1 °C“)
+			if strings.Contains(body, "-1 °C") {
+				t.Errorf("VPN-Art %s, Seite %s: Platzhalter-Temperatur angezeigt", kind, page)
+			}
+		}
+	}
+}
+
 func TestStatusJSONNoSecrets(t *testing.T) {
 	a, h := setup(t)
 	_ = a.Update(func(c *config.Config) error { c.WG.Priv = "GEHEIM"; c.LTE.PIN = "1234"; return nil })

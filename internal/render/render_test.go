@@ -1,6 +1,7 @@
 package render
 
 import (
+	"net/netip"
 	"strings"
 	"testing"
 
@@ -87,6 +88,31 @@ func TestNft(t *testing.T) {
 	fb := Nft(n, c, State{SSHFallback: true})
 	mustContain(t, fb, "SSH-Notfallmodus")
 	mustNotContain(t, fb, "tcp dport 22")
+}
+
+func TestNetBirdRender(t *testing.T) {
+	n, c := DefaultNet(), testCfg()
+	c.VPN, c.NetBird = config.VPNNetBird, config.NetBird{KillSwitch: true}
+	s := State{Ov: true, OvIface: "wt0", OvResolver: NBResolverDNS, VPNOn: true, OvNet: netip.MustParsePrefix("100.92.0.0/16"),
+		OvRoutes: []netip.Prefix{netip.MustParsePrefix("10.10.0.0/24")}, OvDomain: "netbird.selfhosted"}
+	nft := Nft(n, c, s)
+	mustContain(t, nft, `oifname != "wt0" drop`, `oifname != "wt0" ip daddr`,
+		`iifname "wg0" tcp dport 22 accept`, `iifname "wt0" tcp dport 22 accept`)
+	mustNotContain(t, nft, `oifname != "wg0" drop`)
+	dns := Dnsmasq(n, c, s)
+	mustContain(t, dns, "classless-static-route,100.92.0.0/16,192.168.226.1,10.10.0.0/24,192.168.226.1,0.0.0.0/0,192.168.226.1",
+		"resolv-file=", "server=/netbird.selfhosted/127.0.0.1#5053")
+	// gefährlicher Domainname aus dem Status landet nicht in der Konfig
+	s.OvDomain = "x\nserver=1.2.3.4"
+	mustNotContain(t, Dnsmasq(n, c, s), "1.2.3.4")
+	// Exit-Node
+	s.OvDomain, s.OvExit = "netbird.selfhosted", true
+	mustContain(t, Dnsmasq(n, c, s), "0.0.0.0/1,192.168.226.1,128.0.0.0/1", "no-resolv", "server=127.0.0.1#5053")
+	// noch nicht verbunden: keine Routen-Option, normaler DNS
+	mustNotContain(t, Dnsmasq(n, c, State{Ov: true, OvIface: "wt0", OvResolver: NBResolverDNS, VPNOn: true}), "classless-static-route", "5053")
+	// WireGuard-Kill-Switch zählt bei NetBird nicht
+	c.NetBird.KillSwitch, c.WG.KillSwitch = false, true
+	mustNotContain(t, Nft(n, c, s), "Kill-Switch")
 }
 
 func TestNftAccessTable(t *testing.T) {

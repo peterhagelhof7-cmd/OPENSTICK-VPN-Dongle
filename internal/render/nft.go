@@ -73,13 +73,14 @@ func Nft(n Net, c *config.Config, s State) string {
 		p("    # Captive-Portal gesperrt")
 		p("    drop")
 	}
-	if c.WG.KillSwitch {
+	tun := s.TunnelIface(n)
+	if c.KillSwitchOn() {
 		p("    # Kill-Switch: nur durch den Tunnel")
-		p("    oifname != %q drop", n.WGIface)
+		p("    oifname != %q drop", tun)
 	}
 	if c.Isolate {
 		p("    # LAN-Isolation am Uplink")
-		p("    oifname != %q ip daddr { %s } drop", n.WGIface, privateNets)
+		p("    oifname != %q ip daddr { %s } drop", tun, privateNets)
 	}
 	// Uplink-Namen (wlan0, wwan0/rmnet*, wg0) nicht fest verdrahten:
 	// alles außer zurück ins USB-Netz ist erlaubt.
@@ -94,20 +95,20 @@ func Nft(n Net, c *config.Config, s State) string {
 	return b.String()
 }
 
-// accessIface: Netz der Haken-Tabelle -> iifname (LTE als Muster, der Name
-// des Datennetzes hängt vom Modem ab: wwan0, wwan1 …).
-func accessIface(n Net, net string) string {
+// accessIfaces: Netz der Haken-Tabelle -> iifname(s). „VPN“ = WireGuard und
+// NetBird; LTE als Muster, der Name des Datennetzes hängt vom Modem ab (wwan0, wwan1 …).
+func accessIfaces(n Net, net string) []string {
 	switch net {
 	case config.NetUSB:
-		return n.USBIface
+		return []string{n.USBIface}
 	case config.NetVPN:
-		return n.WGIface
+		return []string{n.WGIface, n.NBIface, n.TSIface}
 	case config.NetWLAN:
-		return n.WLANIface
+		return []string{n.WLANIface}
 	case config.NetLTE:
-		return strings.TrimRight(n.LTEIface, "0123456789") + "*"
+		return []string{strings.TrimRight(n.LTEIface, "0123456789") + "*"}
 	}
-	return ""
+	return nil
 }
 
 // allowRules: <match> aus den freigegebenen Netzen annehmen, sonst verwerfen.
@@ -124,7 +125,9 @@ func allowRules(p func(string, ...any), n Net, acc config.Access, svc, match str
 	}
 	p("    # %s: %s", svc, where)
 	for _, net := range nets {
-		p("    iifname %q %s accept", accessIface(n, net), match)
+		for _, ifn := range accessIfaces(n, net) {
+			p("    iifname %q %s accept", ifn, match)
+		}
 	}
 	p("    %s drop", match)
 }

@@ -83,6 +83,16 @@ func ExportKV(c *Config, sn string) string {
 	p("upd.lte=%d", b2i(c.Update.AllowLTE))
 	p("upd.reboot=%d", b2i(c.Update.AutoReboot))
 	p("upd.github=%d", b2i(c.Update.GitHub))
+	p("vpn.kind=%s", c.VPNKind())
+	p("nb.management=%s", c.NetBird.Management)
+	p("nb.setup_key=%s", c.NetBird.SetupKey)
+	p("nb.hostname=%s", c.NetBird.Hostname)
+	p("nb.killswitch=%d", b2i(c.NetBird.KillSwitch))
+	p("ts.login_server=%s", c.Tailscale.LoginServer)
+	p("ts.auth_key=%s", c.Tailscale.AuthKey)
+	p("ts.hostname=%s", c.Tailscale.Hostname)
+	p("ts.exit_node=%s", c.Tailscale.ExitNode)
+	p("ts.killswitch=%d", b2i(c.Tailscale.KillSwitch))
 	// Freigaben: access.<dienst>=<netz>,<netz> (leer = nirgends)
 	for _, svc := range AccessServices {
 		p("access.%s=%s", svc, strings.Join(c.Access[svc], ","))
@@ -204,6 +214,26 @@ func ImportKV(c *Config, text string) error {
 			c.Update.AutoReboot = on(v)
 		case "upd.github":
 			c.Update.GitHub = on(v)
+		case "vpn.kind":
+			c.VPN = v
+		case "nb.management":
+			c.NetBird.Management = v
+		case "nb.setup_key":
+			c.NetBird.SetupKey = v
+		case "nb.hostname":
+			c.NetBird.Hostname = v
+		case "nb.killswitch":
+			c.NetBird.KillSwitch = on(v)
+		case "ts.login_server":
+			c.Tailscale.LoginServer = v
+		case "ts.auth_key":
+			c.Tailscale.AuthKey = v
+		case "ts.hostname":
+			c.Tailscale.Hostname = v
+		case "ts.exit_node":
+			c.Tailscale.ExitNode = v
+		case "ts.killswitch":
+			c.Tailscale.KillSwitch = on(v)
 		default:
 			if svc, ok := strings.CutPrefix(k, "access."); ok && isService(svc) {
 				if c.Access == nil {

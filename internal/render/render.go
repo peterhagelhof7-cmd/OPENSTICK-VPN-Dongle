@@ -18,6 +18,8 @@ type Net struct {
 	WLANIface string       // wlan0
 	LTEIface  string       // wwan0 (je nach Kernel/Modem auch rmnet_*)
 	WGIface   string       // wg0
+	NBIface   string       // wt0 (NetBird)
+	TSIface   string       // tailscale0
 	USBNet    netip.Prefix // 192.168.226.0/29 (wie ESP)
 	DongleIP  netip.Addr   // 192.168.226.1
 }
@@ -25,7 +27,7 @@ type Net struct {
 // DefaultNet = Werte wie beim ESP-Dongle (PC bekommt .2–.6).
 func DefaultNet() Net {
 	return Net{
-		USBIface: "usb0", WLANIface: "wlan0", LTEIface: "wwan0", WGIface: "wg0",
+		USBIface: "usb0", WLANIface: "wlan0", LTEIface: "wwan0", WGIface: "wg0", NBIface: "wt0", TSIface: "tailscale0",
 		USBNet:   netip.MustParsePrefix("192.168.226.0/29"),
 		DongleIP: netip.MustParseAddr("192.168.226.1"),
 	}
@@ -38,6 +40,30 @@ type State struct {
 	// SSHFallback: USB-Netz fehlt (Gadget nicht hochgekommen) -> SSH ausnahmsweise
 	// auch über WLAN/LTE, damit man sich nicht aussperrt.
 	SSHFallback bool
+
+	// Overlay-Netz (VPN-Art NetBird oder Tailscale): Routen/DNS kommen vom Client
+	Ov         bool
+	OvIface    string         // wt0 / tailscale0
+	OvResolver string         // DNS-Resolver des Clients in dnsmasq-Schreibweise
+	OvRoutes   []netip.Prefix // Netze aus dem Management/Tailnet (ohne 0.0.0.0/0)
+	OvNet      netip.Prefix   // Netz der Overlay-Adressen, z. B. 100.92.0.0/16
+	OvDomain   string         // DNS-Zone der Peers, z. B. netbird.selfhosted
+	OvExit     bool           // Exit-Node -> Volltunnel
+}
+
+// Resolver der Overlay-Clients.
+const (
+	NBResolverAddr = "127.0.0.1:5053"  // für `netbird up --dns-resolver-address`
+	NBResolverDNS  = "127.0.0.1#5053"  // dnsmasq-Schreibweise
+	TSResolverDNS  = "100.100.100.100" // MagicDNS (Quad100) des Tailscale-Clients
+)
+
+// TunnelIface: Interface der gewählten VPN-Art.
+func (s State) TunnelIface(n Net) string {
+	if s.Ov && s.OvIface != "" {
+		return s.OvIface
+	}
+	return n.WGIface
 }
 
 // WGPrefix wandelt addr+mask (ESP-Format) in ein Präfix, z. B. 10.0.0.2/24.

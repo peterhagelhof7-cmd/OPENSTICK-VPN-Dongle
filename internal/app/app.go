@@ -104,11 +104,19 @@ type Status struct {
 	PCName       string `json:"pc_name"`
 	Version      string `json:"version"` // vpndongled-Version
 	SSHFallback  bool   `json:"ssh_fallback"`
+	// NetBird-Client (nur wenn als VPN-Art gewählt)
+	NetBird   *system.NBStatus `json:"netbird,omitempty"`
+	Tailscale *system.TSStatus `json:"tailscale,omitempty"`
 	// Auslastung, gemittelt über loadWindow (60 s); -1 = noch kein Wert
 	CPUPct     float64 `json:"cpu_pct"`
 	RAMPct     float64 `json:"ram_pct"`
 	MemUsedKB  int64   `json:"mem_used_kb"`
 	MemTotalKB int64   `json:"mem_total_kb"`
+	// Temperaturen in °C (-1 = kein Fühler); ThrottleAt = Drosselgrenze der CPU (0 = unbekannt)
+	CPUTemp    float64            `json:"cpu_temp_c"`
+	ModemTemp  float64            `json:"modem_temp_c"`
+	ThrottleAt float64            `json:"throttle_c"`
+	Temps      map[string]float64 `json:"temps_c,omitempty"`
 }
 
 type App struct {
@@ -123,6 +131,8 @@ type App struct {
 	hashes  map[string][32]byte // zuletzt geschriebener Inhalt je Datei/Bereich
 	wgOn    *bool               // zuletzt gesetzter Tunnelzustand (nil = unbekannt)
 	zbxOn   *bool               // dito Zabbix
+	nbOn    *bool               // dito NetBird
+	tsOn    *bool               // dito Tailscale
 
 	mu     sync.RWMutex
 	status Status
@@ -143,7 +153,7 @@ func New(store *config.Store, sys system.Sys, version string) *App {
 	return &App{
 		Store: store, Sys: sys, Net: render.DefaultNet(), Version: version,
 		hashes: map[string][32]byte{}, leds: led.Find(sys), startedAt: time.Now(),
-		status: Status{CfgAvail: -1, HandshakeAge: -1, Version: version, CPUPct: -1, RAMPct: -1},
+		status: Status{CfgAvail: -1, HandshakeAge: -1, Version: version, CPUPct: -1, RAMPct: -1, CPUTemp: -1, ModemTemp: -1},
 	}
 }
 
@@ -190,7 +200,8 @@ func locked(c *config.Config, uplinkUp bool) bool {
 	return !c.Unlocked
 }
 
-func vpnWanted(c *config.Config) bool { return c.WGConfigured() && !c.WG.VPNOff }
+// vpnWanted: WireGuard soll laufen (NetBird hat eigene Logik, siehe netbird.go).
+func vpnWanted(c *config.Config) bool { return c.WGWanted() }
 
 // changed merkt sich den Inhalt und meldet, ob er neu ist.
 func (a *App) changed(key, content string) bool {
@@ -250,8 +261,14 @@ func (a *App) Apply() error {
 	}
 	a.wgOn = &want
 
+	// 2b) NetBird / Tailscale (statt WireGuard; erst trennen, dann verbinden)
+	errs = append(errs, a.applyNetBird(c)...)
+	errs = append(errs, a.applyTailscale(c)...)
+
 	// 3) dnsmasq + nftables (abhängig vom Laufzeitzustand)
 	rs := render.State{Locked: locked(c, st.Uplink != ""), VPNOn: want, SSHFallback: !a.usbPresent()}
+	nbRenderState(&rs, c, st.NetBird)
+	tsRenderState(&rs, c, st.Tailscale)
 	if rs.SSHFallback && !st.SSHFallback {
 		log.Printf("WARNUNG: %s fehlt – SSH-Notfallmodus (SSH auch über WLAN/LTE erreichbar)", a.Net.USBIface)
 	}
@@ -299,7 +316,7 @@ func (a *App) Apply() error {
 	}
 
 	a.mu.Lock()
-	a.status.Locked, a.status.VPNOn, a.status.SSHFallback = rs.Locked, want, rs.SSHFallback
+	a.status.Locked, a.status.VPNOn, a.status.SSHFallback = rs.Locked, rs.VPNOn, rs.SSHFallback
 	a.mu.Unlock()
 
 	err := errors.Join(errs...)
@@ -447,6 +464,16 @@ func (a *App) tick() {
 		out, _ = a.Sys.Run("wg", "show", a.Net.WGIface, "transfer")
 		ns.RX, ns.TX = system.ParseTransfer(out)
 	}
+	prevOv := nbKey(ns.NetBird) + "|" + tsKey(ns.Tailscale)
+	ns.NetBird, ns.Tailscale = nil, nil
+	if c.NBWanted() {
+		ns.NetBird = a.nbStatus()
+		ns.VPNUp = ns.NetBird.Connected()
+	}
+	if c.TSWanted() {
+		ns.Tailscale = a.tsStatus()
+		ns.VPNUp = ns.Tailscale.Connected()
+	}
 
 	// für Zabbix: Uplink-Code, WLAN-Gateway (zuletzt bekannt), PC-Lease
 	ns.UplinkCode = map[string]int{"": 0, "wlan": 1, "lte": 2}[ns.Uplink]
@@ -460,6 +487,7 @@ func (a *App) tick() {
 		ns.PCIP, ns.PCName = system.ParseLeases(string(b))
 	}
 	a.sampleLoad(now, &ns)
+	a.sampleThermal(&ns)
 	ns.Updated = now
 
 	a.mu.Lock()
@@ -470,7 +498,8 @@ func (a *App) tick() {
 	a.mu.Unlock()
 
 	// Captive-Zustand / Uplinkwechsel / USB-Netz da oder weg -> Regeln nachziehen
-	if locked(c, ns.Uplink != "") != prevLocked || ns.Uplink != prevUplink || !a.usbPresent() != ns.SSHFallback {
+	if locked(c, ns.Uplink != "") != prevLocked || ns.Uplink != prevUplink || !a.usbPresent() != ns.SSHFallback ||
+		nbKey(ns.NetBird)+"|"+tsKey(ns.Tailscale) != prevOv { // Overlay: Routen/DNS/Verbindung geändert
 		_ = a.Apply()
 	}
 
