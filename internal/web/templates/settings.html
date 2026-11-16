@@ -224,7 +224,8 @@
 
 <div class="card"><h2>Zurücksetzen</h2>
 <form method="post" action="/settings/reset" onsubmit="return confirm('Wirklich zurücksetzen?')">
-<select name="scope"><option value="wifi">WLANs</option><option value="wg">WireGuard</option><option value="lte">LTE</option><option value="wifiwg">WLANs + WireGuard</option><option value="all">Alles (Werkseinstellung, admin/admin)</option></select>
+<select name="scope"><option value="wifi">WLANs</option><option value="wg">WireGuard</option><option value="netbird">NetBird (inkl. Abmeldung am Stick)</option><option value="tailscale">Tailscale (inkl. Abmeldung am Stick)</option><option value="vpn">Alle VPN-Zugänge (WireGuard, NetBird, Tailscale)</option><option value="lte">LTE</option><option value="wifiwg">WLANs + WireGuard</option><option value="all">Alles (Werkseinstellung, admin/admin)</option></select>
+<p class="mut" style="font-size:13px;margin:6px 0 0">NetBird/Tailscale: Der Stick meldet sich ab und löscht seine Anmeldung; erneut verbinden geht nur mit neuem Setup-/Auth-Key. Den Eintrag im NetBird-/Tailscale-Dashboard ggf. dort löschen.</p>
 <input type="hidden" name="confirm" value="ja"><button class="danger">Zurücksetzen</button></form></div>
 <script>
 function swchk(){var e=document.getElementById('swst');e.textContent='prüfe …';

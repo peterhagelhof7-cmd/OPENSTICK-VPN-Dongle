@@ -899,7 +899,10 @@ func (s *Server) postReset(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, "/settings", err)
 		return
 	}
-	back(w, r, "/settings", "Zurückgesetzt: "+scope)
+	names := map[string]string{"wifi": "WLANs", "wg": "WireGuard", "netbird": "NetBird (abgemeldet)",
+		"tailscale": "Tailscale (abgemeldet)", "vpn": "alle VPN-Zugänge", "lte": "LTE",
+		"wifiwg": "WLANs + WireGuard", "all": "alles (Werkseinstellung)"}
+	back(w, r, "/settings", "Zurückgesetzt: "+names[scope])
 }
 
 func (s *Server) postReboot(w http.ResponseWriter, r *http.Request) {

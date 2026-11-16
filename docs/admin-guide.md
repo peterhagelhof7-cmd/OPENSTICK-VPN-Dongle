@@ -169,7 +169,14 @@ Volltunnel = `0.0.0.0/1` + `128.0.0.0/1` (schlägt jede andere Standardroute). *
 Tunnel kein Internet für den PC. **VPN-Schalter**: Tunnel aus, Konfiguration bleibt.
 
 **VPN-Art** (Einstellungen → VPN-Art): WireGuard, NetBird oder Tailscale – immer nur eine ist aktiv,
-die anderen Clients laufen dann gar nicht. Der VPN-Schalter dort gilt für alle drei.
+die anderen Clients laufen dann gar nicht. Der VPN-Schalter dort gilt für alle drei. Die Status-Zeile
+„VPN“ nennt die aktive Technik.
+
+**Routen zum PC nach einem Wechsel:** Ändern sich die Routen, die der PC per DHCP bekommt (VPN-Art,
+Volltunnel, Routen aus NetBird/Tailscale, Captive-Portal), meldet der Stick sein USB-Netz nach 3 s Ruhe
+kurz ab und wieder an – wie Ab- und Anstecken. Der PC baut den Adapter neu auf und hat nach ~4 s genau
+die aktuellen Routen; ein VPN-Ziel ist nach ~10 s erreichbar. Eine laufende SSH-/RDP-Verbindung über
+den Stick reißt dabei kurz ab. (Nur „Link aus/an“ reicht nicht: Windows behält dann die alten Routen.)
 
 **NetBird** (Einstellungen → NetBird):
 
@@ -264,6 +271,9 @@ dem Backup zurückschreiben (`edl w <partition> <backup>\<partition>.bin`) oder 
 
 ## 10. Sicherheit
 
+- Zurücksetzen (Einstellungen → Zurücksetzen) gibt es je Bereich: WLANs, WireGuard, NetBird, Tailscale,
+  alle VPN-Zugänge, LTE oder alles. Bei NetBird/Tailscale meldet sich der Stick ab und löscht seine
+  Anmeldung – neu verbinden nur mit neuem Key; den Eintrag im Dashboard ggf. dort löschen.
 - Admin-Passwort und root-Passwort setzen; SSH-Schlüssel statt Passwort.
 - Weboberfläche nur dort freigeben, wo nötig (über VPN ist auch die Übersicht ohne Login erreichbar).
 - Konfig-Exporte enthalten Schlüssel (verschlüsselt) – das Secret getrennt aufbewahren.

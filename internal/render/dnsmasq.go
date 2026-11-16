@@ -78,6 +78,10 @@ func Dnsmasq(n Net, c *config.Config, s State) string {
 // reDomain: nur harmlose DNS-Namen in die dnsmasq-Konfig übernehmen.
 var reDomain = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9-]{0,62}\.)*[A-Za-z0-9-]{1,63}$`)
 
+// PushRoutes: die Routen, die der PC per Option 121 bekommt (für den
+// „Kabel ab/an“-Anstoß nach einer Änderung).
+func PushRoutes(c *config.Config, s State) []netip.Prefix { return pushRoutes(c, s) }
+
 // pushRoutes: welche Routen der PC per Option 121 bekommt.
 // Ohne VPN: keine (PC nimmt Option 3 = Dongle als Default-Gateway).
 func pushRoutes(c *config.Config, s State) []netip.Prefix {

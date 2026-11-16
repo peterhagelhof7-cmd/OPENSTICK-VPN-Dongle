@@ -51,6 +51,9 @@ const SSHUnit = "ssh"
 
 // usbPresent: gibt es das USB-Netz (Gadget aktiv)?
 func (a *App) usbPresent() bool {
+	if a.bouncing.Load() { // bewusst kurz abgemeldet (bounce.go) – kein Ausfall
+		return true
+	}
 	_, err := a.Sys.ReadFile("/sys/class/net/" + a.Net.USBIface + "/operstate")
 	return err == nil
 }
@@ -104,6 +107,7 @@ type Status struct {
 	PCName       string `json:"pc_name"`
 	Version      string `json:"version"` // vpndongled-Version
 	SSHFallback  bool   `json:"ssh_fallback"`
+	VPNKind      string `json:"vpn_kind"` // wireguard | netbird | tailscale
 	// NetBird-Client (nur wenn als VPN-Art gewählt)
 	NetBird   *system.NBStatus `json:"netbird,omitempty"`
 	Tailscale *system.TSStatus `json:"tailscale,omitempty"`
@@ -133,6 +137,13 @@ type App struct {
 	zbxOn   *bool               // dito Zabbix
 	nbOn    *bool               // dito NetBird
 	tsOn    *bool               // dito Tailscale
+
+	// „Kabel ab/an“ nach Routenwechsel (bounce.go)
+	bounceMu    sync.Mutex
+	bounceTimer *time.Timer
+	pushInit    bool
+	pushKey     string
+	bouncing    atomic.Bool
 
 	mu     sync.RWMutex
 	status Status
@@ -283,6 +294,9 @@ func (a *App) Apply() error {
 			errs = append(errs, err)
 			a.forget("dnsmasq")
 		}
+	}
+	if !st.Updated.IsZero() { // vor der ersten Messung gilt „gesperrt“ – kein Vergleichswert
+		a.notePushRoutes(fmt.Sprint(render.PushRoutes(c, rs)))
 	}
 	if rules := render.Nft(a.Net, c, rs); a.changed("nft", rules) {
 		if err := a.Sys.WriteFile(NftFile, []byte(rules), 0o644); err != nil {
@@ -464,6 +478,7 @@ func (a *App) tick() {
 		out, _ = a.Sys.Run("wg", "show", a.Net.WGIface, "transfer")
 		ns.RX, ns.TX = system.ParseTransfer(out)
 	}
+	ns.VPNKind = c.VPNKind()
 	prevOv := nbKey(ns.NetBird) + "|" + tsKey(ns.Tailscale)
 	ns.NetBird, ns.Tailscale = nil, nil
 	if c.NBWanted() {
@@ -660,7 +675,18 @@ func (a *App) ApplyServer() error {
 // Reset löscht Bereiche der Konfig (wie ESP /reset).
 func (a *App) Reset(scope string) error {
 	d := config.Default()
-	return a.Update(func(c *config.Config) error {
+	var forget []string // Overlay-Clients, deren Anmeldung mit gelöscht wird
+	switch scope {
+	case "all", "vpn":
+		forget = []string{config.VPNNetBird, config.VPNTailscale}
+	case config.VPNNetBird, config.VPNTailscale:
+		forget = []string{scope}
+	}
+	// 1) solange der Client ggf. noch läuft: beim Management/Tailnet abmelden
+	for _, k := range forget {
+		a.logoutOverlay(k)
+	}
+	err := a.Update(func(c *config.Config) error {
 		switch scope {
 		case "all":
 			*c = *d
@@ -668,6 +694,12 @@ func (a *App) Reset(scope string) error {
 			c.WLANs = nil
 		case "wg":
 			c.WG = d.WG
+		case config.VPNNetBird:
+			c.NetBird = d.NetBird
+		case config.VPNTailscale:
+			c.Tailscale = d.Tailscale
+		case "vpn":
+			c.VPN, c.WG, c.NetBird, c.Tailscale = d.VPN, d.WG, d.NetBird, d.Tailscale
 		case "lte":
 			c.LTE = d.LTE
 		case "wifiwg":
@@ -675,8 +707,51 @@ func (a *App) Reset(scope string) error {
 		default:
 			return fmt.Errorf("unbekannter Bereich %q", scope)
 		}
+		// gelöschte VPN-Art nicht ausgewählt lassen
+		if scope == c.VPN {
+			c.VPN = config.VPNWireGuard
+		}
 		return nil
 	})
+	// 2) Client ist jetzt aus (Apply) -> lokalen Anmeldezustand löschen, damit er
+	// beim erneuten Auswählen nicht mit der alten Identität weitermacht
+	for _, k := range forget {
+		a.wipeOverlayState(k)
+	}
+	return err
+}
+
+// logoutOverlay meldet den Client beim Management/Tailnet ab (best effort:
+// läuft der Dienst nicht, scheitert das sofort – dann bleibt das Gerät dort
+// stehen und muss im Dashboard gelöscht werden).
+func (a *App) logoutOverlay(kind string) {
+	var err error
+	switch kind {
+	case config.VPNNetBird:
+		_, err = a.Sys.Run("netbird", "deregister")
+	case config.VPNTailscale:
+		_, err = a.Sys.Run("tailscale", "logout")
+	}
+	if err != nil {
+		log.Printf("%s abmelden: %v (Gerät ggf. im Dashboard löschen)", kind, err)
+	}
+}
+
+// Lokaler Anmeldezustand der Clients (Schlüssel, Identität).
+var overlayState = map[string][]string{
+	config.VPNNetBird:   {"/var/lib/netbird/*.json", "/var/lib/netbird/profiles.v1/*"},
+	config.VPNTailscale: {"/var/lib/tailscale/tailscaled.state"},
+}
+
+func (a *App) wipeOverlayState(kind string) {
+	for _, pat := range overlayState[kind] {
+		files, _ := a.Sys.Glob(pat)
+		for _, f := range files {
+			if err := a.Sys.Remove(f); err != nil {
+				log.Printf("%s löschen: %v", f, err)
+			}
+		}
+	}
 }
 
 func (a *App) Reboot() {

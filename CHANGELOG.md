@@ -1,5 +1,14 @@
 # Änderungen
 
+## v0.2.1
+
+- Routenwechsel kommen sofort beim PC an: Ändern sich die per DHCP verteilten Routen (VPN-Art,
+  Volltunnel, NetBird/Tailscale-Routen), meldet der Stick sein USB-Netz kurz ab und wieder an – der PC
+  hat nach ~4 s genau die neuen Routen (vorher bis zu 5 min die alten)
+- Status: VPN-Zeile nennt die Technik (WireGuard / NetBird / Tailscale), `status.json` hat `vpn_kind`
+- Zurücksetzen auch für NetBird, Tailscale und alle VPN-Zugänge – inklusive Abmeldung des Clients und
+  Löschen seiner lokalen Anmeldung
+
 ## v0.2.0
 
 Zero-Trust-Netze: der Stick als Hardware-Client für NetBird und Tailscale/Headscale.

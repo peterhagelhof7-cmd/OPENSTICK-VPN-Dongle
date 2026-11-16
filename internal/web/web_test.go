@@ -388,6 +388,14 @@ func TestStatusLoadForEveryVPNKind(t *testing.T) {
 			if !strings.Contains(body, "Auslastung") {
 				t.Errorf("VPN-Art %s, Seite %s: Auslastung fehlt", kind, page)
 			}
+			tech := map[string]string{"wireguard": "<b>WireGuard</b>", "netbird": "<b>NetBird</b>", "tailscale": "<b>Tailscale</b>"}[kind]
+			if !strings.Contains(body, `<span>VPN</span><span>`+tech) {
+				t.Errorf("VPN-Art %s, Seite %s: Technik fehlt in der VPN-Zeile", kind, page)
+			}
+			if page == "/settings" && (!strings.Contains(body, `<option value="tailscale">Tailscale (inkl. Abmeldung`) ||
+				!strings.Contains(body, `<option value="vpn">Alle VPN-Zugänge`)) {
+				t.Errorf("Zurücksetzen ohne NetBird/Tailscale/alle VPNs")
+			}
 			// vor dem ersten Tick keine Temperatur (kein „-1 °C“)
 			if strings.Contains(body, "-1 °C") {
 				t.Errorf("VPN-Art %s, Seite %s: Platzhalter-Temperatur angezeigt", kind, page)
