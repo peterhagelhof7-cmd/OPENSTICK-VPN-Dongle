@@ -61,9 +61,16 @@ Get-ChildItem $out -File | Where-Object Name -ne 'NOTES.md' | ForEach-Object { "
 
 if ($Publish) {
     $files = Get-ChildItem $out -File | Where-Object Name -ne 'NOTES.md' | ForEach-Object FullName
-    git push origin $tag
-    if ($LASTEXITCODE) { throw 'Tag-Push fehlgeschlagen' }
-    gh release create $tag @files --title "$tag" --notes-file $notes --verify-tag
-    if ($LASTEXITCODE) { throw 'gh release create fehlgeschlagen' }
+    # PS 5.1: git/gh schreiben Fortschritt nach stderr -> mit EAP Stop waere das ein Abbruch
+    $ErrorActionPreference = 'Continue'
+    git push origin $tag 2>&1 | ForEach-Object { "$_" }
+    $rc = $LASTEXITCODE
+    if (-not $rc) {
+        gh release create $tag @files --title "$tag" --notes-file $notes --verify-tag 2>&1 | ForEach-Object { "$_" }
+        $rc2 = $LASTEXITCODE
+    }
+    $ErrorActionPreference = 'Stop'
+    if ($rc) { throw 'Tag-Push fehlgeschlagen' }
+    if ($rc2) { throw 'gh release create fehlgeschlagen' }
     Write-Host "Auf GitHub veroeffentlicht: $tag" -ForegroundColor Green
 }
