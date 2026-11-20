@@ -50,6 +50,7 @@ Der Engpass ist das 2,4-GHz-WLAN des Sticks (WCN3620, ~4–7 Mbit/s), nicht CPU 
 | NetBird / Tailscale | alternativ zu WireGuard (VPN-Art wählbar): Stick als Peer in einem [NetBird](https://netbird.io)-Netz oder als Gerät in einem [Tailscale](https://tailscale.com)-Tailnet bzw. bei Headscale – Zugriffe per Gruppen/Richtlinien im Management, Routen/DNS/Exit-Node von dort, Anmeldung per Setup-/Auth-Key |
 | Sicherheit | Kill-Switch, LAN-Isolation, Captive-Portal ohne Uplink, Basic-Auth, CSRF-Bremse |
 | Zugriff auf den Stick | **Haken-Tabelle** Weboberfläche/SSH/Ping × USB/VPN/WLAN/LTE (Firewall) |
+| SMS | **lesen und senden über die Weboberfläche** (einschaltbar), eigene **Rufnummer** im Status |
 | Status | Uplink, WLAN-Signal, LTE, VPN, **CPU/RAM gemittelt über 60 s**, **Temperatur** (CPU/Modem, Drosselgrenze); alles auch als `status.json` |
 | Ressourcen | RDP-Dateien, Links, SSH, Datei-Downloads vom Stick |
 | Konfig | Export/Import verschlüsselt (BHVPN1, kompatibel zum ESP und zu `tools/admin.ps1`), Config-Server |

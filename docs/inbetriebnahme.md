@@ -210,6 +210,12 @@ Abhaken und Ergebnis notieren. In Klammern steht die entsprechende Phase beim ES
 | 30 | SSH über WLAN/LTE | von einem Gerät im selben WLAN: Verbindung wird verworfen (Timeout) |
 | 31 | SSH-Notfallmodus | Gadget lösen (`echo "" > /sys/kernel/config/usb_gadget/vpndongle/UDC`): Prüfen, ob usb0 verschwindet; falls ja, SSH über WLAN offen + Warnung in der Weboberfläche. Danach `usb-gadget.sh start` |
 | 32 | Root-Passwort per Weboberfläche | neues Passwort gilt sofort, Altes nicht mehr; Export enthält es nicht |
+| 33 | Rufnummer (SIM) | Status zeigt die Nummer der SIM; ohne: eingetragene mit „(eingetragen)“, sonst „unbekannt“; `mmcli -m any -J` → `own-numbers` notieren |
+| 34 | SMS empfangen | „SMS aktiv“, SMS ans Handy-Gegenüber → nach ≤ 15 s in der Liste, Zähler in der Kopfzeile; `mmcli -m any --messaging-list-sms` danach leer |
+| 35 | SMS mehrteilig + Umlaute/Emoji | lange SMS (> 160 Zeichen) mit äöüß und 😀 kommt als **eine** Nachricht, Zeichen korrekt |
+| 36 | SMS senden | an ein Handy, mit äöü und mit `'` und `"` im Text → kommt unverändert an (`"` als ”); Fehlversuch (falsche Nummer) steht mit Fehler in der Liste |
+| 37 | SMS bei reinem WLAN | Uplink „nur WLAN“: Modem wird eingeschaltet (`mmcli -m any` → enabled/registered), SMS kommen trotzdem an |
+| 38 | SMS-Datenschutz | `journalctl -u vpndongled` enthält weder Text noch Nummer; Reset LTE löscht `/var/lib/vpndongle/sms.json` |
 
 Zu prüfende Annahmen (im Code mit `TODO(HW)` markiert):
 - UDC-Name und ob das Image schon ein eigenes USB-Gadget (RNDIS) anlegt

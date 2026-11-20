@@ -101,6 +101,10 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("POST /wifi", s.wifiAdd)
 	m.HandleFunc("GET /rdp", s.rdp)
 	m.HandleFunc("GET /dl", s.download)
+	m.HandleFunc("GET /sms", s.sms)
+	m.HandleFunc("GET /sms.json", s.smsJSON)
+	m.HandleFunc("POST /sms/send", s.smsSend)
+	m.HandleFunc("POST /sms/del", s.smsDel)
 	// Admin
 	a := func(p string, h http.HandlerFunc) { m.Handle(p, s.auth(h)) }
 	a("GET /settings", s.settings)
@@ -281,6 +285,10 @@ type pageData struct {
 	DefPW                 bool
 	Settings              bool
 	DryRun                bool
+	// SMS (Kopfzeile + Status): eingeschaltet, Zahl ungelesener, auf der SMS-Seite
+	SMSOn     bool
+	SMSUnread int
+	SMSPage   bool
 	// Zabbix / Updates (nur Einstellungsseite)
 	ZbxProxy, ZbxHost string
 	ZbxWarn           string
@@ -298,6 +306,9 @@ func (s *Server) data(r *http.Request, settings bool) pageData {
 		DryRun: s.App.Sys.DryRun(),
 	}
 	d.DefPW = d.Cfg.DefaultPassword()
+	if d.SMSOn = app.SMSActive(d.Cfg); d.SMSOn {
+		d.SMSUnread = s.App.SMSUnread()
+	}
 	if settings {
 		d.Sys = s.App.SysInfo()
 		d.ZbxProxy, d.ZbxHost = d.Cfg.ZabbixNames(d.Serial)
@@ -605,6 +616,11 @@ func (s *Server) postLTE(w http.ResponseWriter, r *http.Request) {
 		l := c.LTE
 		l.Enabled = checked(r, "enabled")
 		l.Roaming = checked(r, "roaming")
+		l.SMS = checked(r, "sms")
+		l.Number = app.NormalizeNumber(r.FormValue("number"))
+		if l.Number != "" && !app.ValidNumber(l.Number) {
+			return fmt.Errorf("ungültige Rufnummer")
+		}
 		l.APN = strings.TrimSpace(r.FormValue("apn"))
 		l.User = strings.TrimSpace(r.FormValue("user"))
 		if v := r.FormValue("pass"); v != "" {

@@ -1,5 +1,18 @@
 # Änderungen
 
+## v0.3.0
+
+- **SMS über die Weboberfläche:** neue Seite „SMS“ (Kopfzeile, ohne Login wie die Übersicht) zum Lesen und
+  Senden, eingeschaltet über den Haken **„SMS aktiv“** unter Einstellungen → LTE. Empfangene SMS holt der
+  Stick alle 15 s vom Modem in eine eigene Ablage auf dem Flash (letzte 200) und löscht sie im Modem, damit
+  dessen Speicher nie voll läuft; mehrteilige SMS erst, wenn alle Teile da sind. Senden mit Zeichen- und
+  Teile-Zähler, höchstens 640 Zeichen und 20 SMS pro Stunde; Antworten-Knopf, Löschen einzeln/alle. Neue
+  SMS: Zähler in der Kopfzeile und im Status, die offene Seite lädt sich neu. SMS-Inhalt und -Nummer stehen
+  nie im Journal. Zurücksetzen von LTE bzw. „alles“ löscht die Ablage mit
+- **Rufnummer im Status:** von der SIM, sonst die unter Einstellungen → LTE eingetragene, sonst „unbekannt“
+- Ist SMS aktiv und das Modem ausgeschaltet (z. B. reiner WLAN-Betrieb), schaltet der Stick es ein, damit
+  SMS ankommen
+
 ## v0.2.2
 
 - Zabbix-Proxy und -Agent auf **7.4** (vorher 7.0): Ein 7.4-Server meldete den 7.0-Proxy als veraltet

@@ -50,7 +50,7 @@ func TestKVRoundTrip(t *testing.T) {
 	c.WG = WireGuard{Priv: "cHJpdg==", Pub: "cHVi", Endpoint: "vpn.example.org", Port: 51820,
 		Addr: "10.10.0.206", Mask: "255.255.255.0", Keepalive: 25, FullTunnel: true, KillSwitch: true,
 		DNS: "9.9.9.9", MTU: 1360}
-	c.LTE = LTE{Enabled: true, APN: "internet.telekom", PIN: "1234"}
+	c.LTE = LTE{Enabled: true, APN: "internet.telekom", PIN: "1234", SMS: true, Number: "+49 151 2345678"}
 	c.Uplink = UplinkLTE
 	c.Zabbix = Zabbix{Enabled: true, Server: "10.10.0.1:10051", ProxyName: "p1", PSKIdentity: "id", PSK: "abcd",
 		MonPC: false, PCAgent: true, MonWLAN: true, Targets: []ZbxTarget{{Name: "Drucker", Addr: "192.168.1.20"}}}

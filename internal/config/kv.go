@@ -62,6 +62,8 @@ func ExportKV(c *Config, sn string) string {
 	p("lte.pass=%s", c.LTE.Pass)
 	p("lte.pin=%s", c.LTE.PIN)
 	p("lte.roaming=%d", b2i(c.LTE.Roaming))
+	p("lte.sms=%d", b2i(c.LTE.SMS))
+	p("lte.number=%s", c.LTE.Number)
 	z := c.Zabbix
 	p("zbx.enabled=%d", b2i(z.Enabled))
 	p("zbx.server=%s", z.Server)
@@ -182,6 +184,10 @@ func ImportKV(c *Config, text string) error {
 			c.LTE.PIN = v
 		case "lte.roaming":
 			c.LTE.Roaming = on(v)
+		case "lte.sms":
+			c.LTE.SMS = on(v)
+		case "lte.number":
+			c.LTE.Number = v
 		case "zbx.enabled":
 			c.Zabbix.Enabled = on(v)
 		case "zbx.server":

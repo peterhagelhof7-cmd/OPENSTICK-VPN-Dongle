@@ -47,6 +47,9 @@
 </div>
 <label class="chk"><input type="checkbox" name="roaming" {{if .Cfg.LTE.Roaming}}checked{{end}}> Roaming erlauben</label>
 <label class="chk"><input type="checkbox" name="pin_clear"> gespeicherte PIN löschen</label>
+<label class="chk"><input type="checkbox" name="sms" {{if .Cfg.LTE.SMS}}checked{{end}}> SMS aktiv</label>
+<p class="mut" style="font-size:13px;margin:0">Empfangen und Senden über die Seite „SMS“ – ohne Login, für jeden, der die Übersicht erreicht (siehe „Zugriff auf den Stick“). Höchstens 20 gesendete SMS pro Stunde.</p>
+<label>Rufnummer (nur Anzeige, falls die SIM sie nicht meldet)</label><input type="text" name="number" value="{{.Cfg.LTE.Number}}" placeholder="z. B. +49 151 23456789" maxlength="24">
 <button>Speichern</button></form></div>
 
 <div class="card"><h2>VPN-Art</h2>

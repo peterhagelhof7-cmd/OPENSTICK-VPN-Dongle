@@ -158,6 +158,15 @@ type App struct {
 	startedAt   time.Time
 
 	load loadAvg // CPU/RAM-Mittelwerte (nur aus tick)
+
+	// SMS (sms.go): Ablage unter smsMu, Abruf-Zeitpunkte nur aus tick
+	smsMu        sync.Mutex
+	smsLoaded    bool
+	smsList      []SMSMsg
+	smsNextID    int64
+	smsSent      []time.Time
+	smsLastPoll  time.Time
+	smsEnableTry time.Time
 }
 
 func New(store *config.Store, sys system.Sys, version string) *App {
@@ -520,6 +529,9 @@ func (a *App) tick() {
 
 	a.lteFallback(c, ns, now)
 	a.updateLED(ns)
+	if SMSActive(c) {
+		a.smsPoll(ns, now)
+	}
 
 	// Config-Server: einmal 3 min nach erstem Uplink
 	if ns.Uplink == "" {
@@ -717,6 +729,12 @@ func (a *App) Reset(scope string) error {
 	// beim erneuten Auswählen nicht mit der alten Identität weitermacht
 	for _, k := range forget {
 		a.wipeOverlayState(k)
+	}
+	// SMS sind persönliche Daten: mit dem LTE-Zugang bzw. „alles“ mit weg
+	if err == nil && (scope == "all" || scope == "lte") {
+		if derr := a.SMSDelete(0); derr != nil {
+			log.Printf("SMS-Ablage löschen: %v", derr)
+		}
 	}
 	return err
 }

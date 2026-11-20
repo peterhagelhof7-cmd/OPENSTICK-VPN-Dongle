@@ -15,6 +15,10 @@ main{max-width:760px;margin:0 auto;padding:16px}
 .mut{color:var(--mut)}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
 .msg{padding:10px 14px;border-radius:8px;margin-bottom:14px;background:var(--card);border-left:4px solid var(--acc)}
 .alert{border-left-color:var(--bad)}
+textarea{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);font:inherit;resize:vertical}
+.sms{padding:8px 0;border-bottom:1px dashed var(--line)}.sms:last-child{border:0}
+.sms .hd{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:var(--mut)}
+.sms .tx{white-space:pre-wrap;overflow-wrap:anywhere;margin:3px 0}.sms.new .tx{font-weight:600}
 label{display:block;margin:8px 0 2px;font-size:13px;color:var(--mut)}
 input[type=text],input[type=password],input[type=number],select{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);font:inherit}
 .chk{display:flex;gap:8px;align-items:center;margin:8px 0;color:var(--fg);font-size:14px}
@@ -29,7 +33,7 @@ table.acc{width:100%;border-collapse:collapse;margin:4px 0}table.acc th,table.ac
 table.acc th{font-size:13px;color:var(--mut);font-weight:600}table.acc td:first-child,table.acc th:first-child{text-align:left}
 table.acc input{width:18px;height:18px}
 </style></head><body>
-<header><h1>{{.Cfg.SystemName}}</h1>{{if .Settings}}<a href="/">Übersicht</a>{{else}}<a href="/settings">Einstellungen</a>{{end}}</header>
+<header><h1>{{.Cfg.SystemName}}</h1>{{if or .Settings .SMSPage}}<a href="/">Übersicht</a>{{end}}{{if and .SMSOn (not .SMSPage)}}<a href="/sms">SMS{{if .SMSUnread}} <b>({{.SMSUnread}} neu)</b>{{end}}</a>{{end}}{{if not .Settings}}<a href="/settings">Einstellungen</a>{{end}}</header>
 <main>
 {{if .DryRun}}<div class="msg alert">Entwicklungsmodus (Dry-Run): Befehle werden nur protokolliert.</div>{{end}}
 {{with .Msg}}<div class="msg">{{.}}</div>{{end}}
@@ -42,7 +46,8 @@ table.acc input{width:18px;height:18px}
 {{define "status"}}<div class="card"><h2>Status</h2>
 <div class="row"><span>Internet über</span><span>{{if eq .St.Uplink "wlan"}}<span class="ok">WLAN</span>{{else if eq .St.Uplink "lte"}}<span class="warn">LTE (Mobilfunk)</span>{{else}}<span class="bad">kein Uplink</span>{{end}}</span></div>
 <div class="row"><span>WLAN</span><span>{{if .St.WLANUp}}{{.St.WLANSSID}} <span class="bar"><i style="width:{{.St.WLANSignal}}%"></i></span> {{.St.WLANSignal}} %{{else}}<span class="mut">nicht verbunden</span>{{end}}</span></div>
-{{if .Cfg.LTE.Enabled}}<div class="row"><span>LTE</span><span>{{if .St.LTE.Present}}{{if .St.LTE.Operator}}{{.St.LTE.Operator}} · {{end}}{{.St.LTE.State}}{{with .St.LTE.Tech}} · {{.}}{{end}} <span class="bar"><i style="width:{{.St.LTE.Signal}}%"></i></span> {{.St.LTE.Signal}} %{{with .St.LTE.Unlock}} · <span class="bad">{{.}} nötig</span>{{end}}{{with .St.LTE.Failed}} · <span class="bad">{{.}}</span>{{end}}{{else}}<span class="mut">kein Modem gefunden</span>{{end}}</span></div>{{end}}
+{{if .Cfg.LTE.Enabled}}<div class="row"><span>LTE</span><span>{{if .St.LTE.Present}}{{if .St.LTE.Operator}}{{.St.LTE.Operator}} · {{end}}{{.St.LTE.State}}{{with .St.LTE.Tech}} · {{.}}{{end}} <span class="bar"><i style="width:{{.St.LTE.Signal}}%"></i></span> {{.St.LTE.Signal}} %{{with .St.LTE.Unlock}} · <span class="bad">{{.}} nötig</span>{{end}}{{with .St.LTE.Failed}} · <span class="bad">{{.}}</span>{{end}}{{else}}<span class="mut">kein Modem gefunden</span>{{end}}</span></div>
+<div class="row"><span>Rufnummer</span><span>{{if .St.LTE.Number}}{{.St.LTE.Number}}{{else if .Cfg.LTE.Number}}{{.Cfg.LTE.Number}} <span class="mut">(eingetragen)</span>{{else}}<span class="mut">unbekannt – SIM meldet keine</span>{{end}}{{if .SMSOn}} · <a href="/sms">SMS{{if .SMSUnread}} <b>({{.SMSUnread}} neu)</b>{{end}}</a>{{end}}</span></div>{{end}}
 {{if eq .Cfg.VPN "tailscale"}}<div class="row"><span>VPN</span><span><b>Tailscale</b> · {{with .St.Tailscale}}{{if .Connected}}<span class="ok">verbunden</span> · {{.IP}} · Geräte {{.PeersUp}}/{{.Peers}}{{with .ExitNode}} · Exit-Node {{.}}{{end}}{{else}}<span class="warn">{{.Backend}}</span>{{range .Health}} · {{.}}{{end}}{{end}}{{else}}<span class="mut">{{if .Cfg.WG.VPNOff}}ausgeschaltet{{else}}startet …{{end}}</span>{{end}}{{if .Cfg.Tailscale.KillSwitch}} · Kill-Switch{{end}}</span></div>
 {{else if eq .Cfg.VPN "netbird"}}<div class="row"><span>VPN</span><span><b>NetBird</b> · {{with .St.NetBird}}{{if .Connected}}<span class="ok">verbunden</span> · {{.IP}} · Peers {{.PeersUp}}/{{.Peers}}{{else}}<span class="warn">{{.Daemon}}</span>{{with .MgmtError}} · {{.}}{{end}}{{end}}{{else}}<span class="mut">{{if .Cfg.WG.VPNOff}}ausgeschaltet{{else}}startet …{{end}}</span>{{end}}{{if .Cfg.NetBird.KillSwitch}} · Kill-Switch{{end}}</span></div>
 {{else}}<div class="row"><span>VPN</span><span><b>WireGuard</b> · {{if .St.VPNUp}}<span class="ok">verbunden</span>{{if .Cfg.WG.FullTunnel}} (Volltunnel){{else}} (Split){{end}}{{else if .St.VPNOn}}<span class="warn">verbindet …</span>{{else if .Cfg.WG.VPNOff}}<span class="mut">ausgeschaltet</span>{{else}}<span class="mut">nicht eingerichtet</span>{{end}}{{if .Cfg.WG.KillSwitch}} · Kill-Switch{{end}}</span></div>

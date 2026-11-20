@@ -1,0 +1,39 @@
+{{define "sms"}}{{template "head" .}}
+
+<div class="card"><h2>SMS senden</h2>
+<form method="post" action="/sms/send">
+<label for="number">An (Rufnummer)</label><input type="text" id="number" name="number" value="{{.Number}}" placeholder="+49 151 23456789" maxlength="24" required autocomplete="off">
+<label for="text">Text</label><textarea id="text" name="text" rows="4" maxlength="{{.MaxText}}" required></textarea>
+<div class="mut" style="font-size:13px" id="cnt"></div>
+<button type="submit">Senden</button>
+</form></div>
+
+<div class="card"><h2>Nachrichten</h2>
+{{if .SMS}}{{range .SMS}}<div class="sms{{if and .In (not .Read)}} new{{end}}">
+<div class="hd"><span>{{if .In}}← von <b>{{.Number}}</b>{{else}}→ an <b>{{.Number}}</b>{{end}} · {{.Time.Local.Format "02.01.2006 15:04"}}{{if and .In (not .Read)}} · <span class="ok">neu</span>{{end}}</span>
+<span>{{if .In}}<a href="/sms?to={{.Number}}#text">Antworten</a>{{end}}
+<form class="inline" method="post" action="/sms/del"><input type="hidden" name="id" value="{{.ID}}"><button class="sec">Löschen</button></form></span></div>
+<div class="tx">{{.Text}}</div>
+{{with .Error}}<div class="bad" style="font-size:13px">Nicht gesendet: {{.}}</div>{{end}}
+</div>{{end}}
+<form method="post" action="/sms/del" onsubmit="return confirm('Alle SMS auf dem Stick löschen?')"><input type="hidden" name="all" value="1"><button class="danger">Alle löschen</button></form>
+{{else}}<p class="mut" style="margin:0">Noch keine SMS. Empfangene erscheinen hier nach spätestens ca. 15 s.</p>{{end}}
+</div>
+
+<script>
+(function(){
+var t=document.getElementById('text'),c=document.getElementById('cnt');
+// GSM-7-Grundzeichensatz: 160 Zeichen je SMS (mehrteilig 153), sonst Unicode 70 (67)
+var gsm="@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà";
+function upd(){var s=t.value,n=Array.from(s).length,u=false;
+for(var ch of s){if(gsm.indexOf(ch)<0){u=true;break}}
+var one=u?70:160,multi=u?67:153,parts=n<=one?(n?1:0):Math.ceil(n/multi);
+c.textContent=n+' / {{.MaxText}} Zeichen'+(n?' · '+parts+' SMS'+(u?' (Unicode)':''):'')}
+t.addEventListener('input',upd);upd();
+// Neue SMS: Seite neu laden, solange nichts eingetippt ist
+var last={{if .SMS}}{{(index .SMS 0).ID}}{{else}}0{{end}};
+setInterval(function(){fetch('/sms.json').then(function(r){return r.json()}).then(function(j){
+if(j.last>last&&!t.value&&!document.getElementById('number').value)location.reload()}).catch(function(){})},15000);
+})();
+</script>
+{{template "foot" .}}{{end}}

@@ -129,6 +129,11 @@ func redact(args []string) []string {
 			continue
 		}
 		out[i] = a
+		// SMS-Inhalt und -Empfänger nie ins Journal
+		if strings.HasPrefix(a, "--messaging-create-sms") {
+			out[i] = "--messaging-create-sms=***"
+			continue
+		}
 		switch a {
 		case "password", "psk", "pin", "--pin", "wifi-sec.psk", "gsm.password", "gsm.pin":
 			hide = true

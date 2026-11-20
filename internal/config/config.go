@@ -65,6 +65,10 @@ type LTE struct {
 	Pass    string `json:"pass"`
 	PIN     string `json:"pin"`
 	Roaming bool   `json:"roaming"`
+	// SMS über die Weboberfläche (Seite /sms, ohne Login) – nur mit LTE
+	SMS bool `json:"sms"`
+	// eigene Rufnummer, falls die SIM sie nicht meldet (nur Anzeige)
+	Number string `json:"number"`
 }
 
 // ZbxTarget = zusätzliches Ping-Ziel (z. B. Drucker im WLAN am Uplink).

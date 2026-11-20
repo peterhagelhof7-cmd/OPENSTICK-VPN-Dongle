@@ -140,7 +140,7 @@ Weboberfläche: **`http://192.168.226.1/`**. Die Übersicht ist ohne Login errei
 verbinden, Ressourcen, Dateien), die **Einstellungen** brauchen den Admin-Login – ab Werk `admin`/`admin`,
 **sofort ändern** (Einstellungen → Zugang).
 
-**Status:** Uplink, WLAN mit Signal, LTE, VPN (WireGuard: letzter Handshake und Datenmenge;
+**Status:** Uplink, WLAN mit Signal, LTE mit Rufnummer, VPN (WireGuard: letzter Handshake und Datenmenge;
 NetBird/Tailscale: verbunden, Overlay-IP, Peers, Exit-Node), CPU- und RAM-Auslastung (Mittel über 60 s),
 Temperatur von CPU und Modem mit Drosselgrenze (orange ab 10 °C darunter, rot ab der Grenze).
 Maschinenlesbar unter `/status.json` (dort alle Temperaturfühler einzeln).
@@ -206,7 +206,21 @@ Firewall drehen (`--netfilter-mode=off`) – die Tailnet-ACLs setzt der Client s
 Zugriffs-Tabelle des Sticks gilt zusätzlich.
 
 **LTE:** APN, ggf. PIN und Roaming. „Uplink: Automatisch“ schaltet LTE zu, wenn 20 s kein WLAN da ist,
-und wieder ab, wenn das WLAN 60 s stabil ist.
+und wieder ab, wenn das WLAN 60 s stabil ist. **Rufnummer:** Viele SIM-Karten melden die eigene Nummer
+nicht; dann hier eintragen (nur Anzeige im Status).
+
+**SMS:** Mit dem Haken **„SMS aktiv“** (unter LTE) erscheint in der Kopfzeile die Seite **SMS** – wie die
+Übersicht **ohne Login**: Wer die Weboberfläche erreicht (ab Werk nur der PC am USB, sonst laut Zugriffs-Tabelle),
+kann SMS lesen und senden. Gedacht z. B. für Bestätigungscodes per SMS am Arbeitsplatz.
+- Empfang: Der Stick holt neue SMS alle 15 s vom Modem, legt sie auf dem Flash ab (die letzten 200) und
+  löscht sie im Modem. Mehrteilige SMS erscheinen, sobald alle Teile da sind. Neue SMS zählt die Kopfzeile;
+  die offene SMS-Seite lädt sich selbst neu (nicht, solange etwas eingetippt ist).
+- Senden: Nummer international (`+49…`) oder national (`0151…`), bis 640 Zeichen; der Zähler zeigt, wie viele
+  SMS daraus werden (Umlaute wie ä/ö/ü passen in normale SMS, Emojis machen daraus Unicode-SMS mit 70 Zeichen).
+  Höchstens 20 SMS pro Stunde. Scheitert das Senden, steht die SMS mit Fehler in der Liste.
+- Ist das Modem aus (nur WLAN, keine LTE-Verbindung), schaltet der Stick es für den SMS-Empfang ein.
+- Datenschutz: Inhalt und Nummer stehen nie im Systemprotokoll. „Zurücksetzen: LTE“ bzw. „alles“ löscht die
+  SMS mit; einzeln oder alle löschen geht auf der SMS-Seite. Nicht im Konfig-Export.
 
 **Zugriff auf den Stick:** Haken-Tabelle, aus welchen Netzen Weboberfläche, SSH und Ping erreichbar
 sind. Ab Werk: Weboberfläche nur USB, SSH über USB und VPN, Ping überall. Die Weboberfläche über USB

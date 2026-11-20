@@ -161,8 +161,9 @@ type LTEStatus struct {
 	Operator   string `json:"operator,omitempty"`
 	Registered string `json:"registration,omitempty"`
 	Tech       string `json:"tech,omitempty"`
-	Signal     int    `json:"signal"` // 0–100 %
-	IMEI       string `json:"-"`      // bewusst nicht in API/Log
+	Signal     int    `json:"signal"`           // 0–100 %
+	IMEI       string `json:"-"`                // bewusst nicht in API/Log
+	Number     string `json:"number,omitempty"` // eigene Rufnummer, wenn die SIM sie meldet
 }
 
 func ParseMMCLI(out string) LTEStatus {
@@ -173,6 +174,7 @@ func ParseMMCLI(out string) LTEStatus {
 				FailedReason  string   `json:"state-failed-reason"`
 				Unlock        string   `json:"unlock-required"`
 				AccessTech    []string `json:"access-technologies"`
+				OwnNumbers    []string `json:"own-numbers"`
 				SignalQuality struct {
 					Value string `json:"value"`
 				} `json:"signal-quality"`
@@ -203,5 +205,11 @@ func ParseMMCLI(out string) LTEStatus {
 		s.Tech = ""
 	}
 	s.Signal, _ = strconv.Atoi(g.SignalQuality.Value)
+	for _, n := range g.OwnNumbers {
+		if n = strings.TrimSpace(n); n != "" && n != "--" {
+			s.Number = n
+			break
+		}
+	}
 	return s
 }
