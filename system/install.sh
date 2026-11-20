@@ -8,6 +8,9 @@
 set -eu
 cd "$(dirname "$0")"
 
+# Zabbix-Reihe von Proxy und Agent = Hauptversion des Zabbix-Servers
+ZBX_SERIES=7.4
+
 say() { printf '\n== %s\n' "$*"; }
 warn() { printf '!! %s\n' "$*"; }
 
@@ -34,7 +37,7 @@ nmcli -t -f NAME,TYPE,DEVICE connection show 2>/dev/null | grep -Ei 'usb|gadget|
 case "${VERSION_ID:-}" in
 12 | 13) ;;
 *)
-	echo "Debian $VERSION_ID wird nicht unterstützt (Zabbix 7.0 gibt es für arm64 nur für Debian 12/13)." >&2
+	echo "Debian $VERSION_ID wird nicht unterstützt (Zabbix gibt es für arm64 nur für Debian 12/13)." >&2
 	exit 1
 	;;
 esac
@@ -61,18 +64,32 @@ case "$tz" in
 *) echo "Zeitzone bleibt $tz" ;;
 esac
 
-say "Zabbix 7.0 (Proxy + Agent)"
-if ! dpkg -s zabbix-release >/dev/null 2>&1; then
-	deb="zabbix-release_latest_7.0+debian${VERSION_ID}_all.deb"
+say "Zabbix $ZBX_SERIES (Proxy + Agent)"
+# Der Proxy muss dieselbe Hauptversion haben wie der Zabbix-Server (ein älterer
+# Proxy gilt dort als „veraltet“ und bekommt keine Konfiguration mehr). apt
+# hält ihn innerhalb der Reihe aktuell; eine neue Reihe kommt nur hierüber.
+zbx_have=$(dpkg-query -W -f='${Version}' zabbix-release 2>/dev/null | sed 's/^[0-9]*://; s/-.*//' || true)
+if [ "$zbx_have" != "$ZBX_SERIES" ]; then
+	[ -n "$zbx_have" ] && echo "Zabbix-Paketquelle $zbx_have -> $ZBX_SERIES"
+	deb="zabbix-release_latest_${ZBX_SERIES}+debian${VERSION_ID}_all.deb"
 	tmp=$(mktemp -d)
-	wget -q -O "$tmp/$deb" "https://repo.zabbix.com/zabbix/7.0/debian-arm64/pool/main/z/zabbix-release/$deb"
-	dpkg -i "$tmp/$deb"
+	wget -q -O "$tmp/$deb" "https://repo.zabbix.com/zabbix/$ZBX_SERIES/release/debian/pool/main/z/zabbix-release/$deb"
+	dpkg -i --force-confnew "$tmp/$deb"
 	rm -rf "$tmp"
 	apt-get update
+	if [ -n "$zbx_have" ] && dpkg -s zabbix-proxy-sqlite3 >/dev/null 2>&1; then
+		# Neue Hauptversion: Die SQLite-Datenbank des Proxys ist nur ein Puffer;
+		# der neue Proxy legt sie selbst an (sonst Schema-Upgrade auf dem Flash)
+		systemctl stop zabbix-proxy 2>/dev/null || true
+		rm -f /var/lib/zabbix/zabbix_proxy.db /var/lib/zabbix/zabbix_proxy.db-journal
+	fi
 fi
 zbx_fresh=0
 dpkg -s zabbix-proxy-sqlite3 >/dev/null 2>&1 || zbx_fresh=1
-DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends zabbix-proxy-sqlite3 zabbix-agent
+# confold: Die Konfigs erzeugt vpndongled, das Paket soll sie nicht ersetzen
+DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+	-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold \
+	zabbix-proxy-sqlite3 zabbix-agent
 if [ "$zbx_fresh" = 1 ]; then
 	# Pakete starten die Dienste mit Beispielkonfig – aus, bis Zabbix in der
 	# Weboberfläche eingerichtet ist (vpndongled schaltet sie dann ein)

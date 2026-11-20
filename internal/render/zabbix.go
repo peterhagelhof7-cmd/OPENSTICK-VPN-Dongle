@@ -7,7 +7,7 @@ import (
 	"github.com/peterhagelhof7-cmd/OPENSTICK-VPN-Dongle/internal/config"
 )
 
-// Pfade der Zabbix-Dateien (Debian-Pakete von repo.zabbix.com, 7.0).
+// Pfade der Zabbix-Dateien (Debian-Pakete von repo.zabbix.com, Reihe siehe install.sh).
 const (
 	ZbxProxyConf = "/etc/zabbix/zabbix_proxy.conf"
 	ZbxAgentConf = "/etc/zabbix/zabbix_agentd.conf"

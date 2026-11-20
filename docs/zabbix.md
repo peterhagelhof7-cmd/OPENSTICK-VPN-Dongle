@@ -1,11 +1,17 @@
-# Zabbix-Überwachung (Server 7.0)
+# Zabbix-Überwachung (Server 7.4)
+
+Proxy und Agent auf dem Stick kommen aus der Zabbix-Reihe **7.4** (`ZBX_SERIES` in `system/install.sh`),
+apt hält sie innerhalb der Reihe aktuell. Der Proxy muss dieselbe Hauptversion haben wie der Server:
+Ein älterer Proxy gilt dort als „veraltet“ und bekommt keine Konfiguration mehr, ein neuerer wird
+nicht angenommen. Wechselt der Server die Reihe (z. B. auf 8.0), `ZBX_SERIES` ändern und ein neues
+Release bauen – `install.sh` stellt dann die Paketquelle um und legt die Proxy-Datenbank (nur Puffer) neu an.
 
 Auf dem Stick laufen ein **aktiver Zabbix-Proxy** und ein **Agent**. Der Proxy verbindet sich selbst
 durch den WireGuard-Tunnel zum Server, von außen ist kein offener Port nötig. Fällt der Tunnel aus,
 puffert er die Daten (bis 16 MB im RAM, danach in SQLite, maximal 24 h) und liefert sie nach.
 
 ```
- Agent (Stick) ──127.0.0.1:10051──► Proxy (Stick) ══WireGuard══► Zabbix-Server 7.0
+ Agent (Stick) ──127.0.0.1:10051──► Proxy (Stick) ══WireGuard══► Zabbix-Server 7.4
  Ping WLAN-Gateway / PC / Ziele ◄── Simple Checks (fping) auf dem Proxy
  Agent auf dem PC (optional) ──192.168.226.1:10051──┘
 ```
@@ -77,9 +83,9 @@ passende Windows-Vorlage).
 | LTE-Datenvolumen | grob einige bis einige zehn MB pro Tag, je nach Anzahl der Ziele |
 
 Die Konfigdateien `/etc/zabbix/zabbix_proxy.conf` und `/etc/zabbix/zabbix_agentd.conf` schreibt vpndongled.
-Änderungen von Hand werden überschrieben. Die Parameter wurden gegen die offiziellen 7.0-Beispielkonfigs geprüft
-(Name und Wertebereich). Die Vorlage wurde gegen die Regeln des 7.0-Import-Validators geprüft
-(`go test ./internal/zbxtpl`). Ein echter Import und Start stehen noch aus.
+Änderungen von Hand werden überschrieben. Die Parameter wurden gegen die offiziellen Beispielkonfigs von 7.0 und 7.4.16 geprüft
+(Name und Wertebereich). Die Vorlage ist im 7.0-Format (Server ab 7.0 importieren sie) und wurde gegen
+die Regeln des 7.0-Import-Validators geprüft (`go test ./internal/zbxtpl`). Ein echter Import steht noch aus.
 
 ## Template ändern
 

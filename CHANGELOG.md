@@ -1,5 +1,13 @@
 # Änderungen
 
+## v0.2.2
+
+- Zabbix-Proxy und -Agent auf **7.4** (vorher 7.0): Ein 7.4-Server meldete den 7.0-Proxy als veraltet
+  und gab ihm keine Konfiguration mehr. Vorhandene Sticks stellen beim Update die Paketquelle um,
+  der Proxy legt seine Puffer-Datenbank neu an. Die Reihe steht in `system/install.sh` (`ZBX_SERIES`)
+- `install.sh` behält beim Paket-Upgrade die von vpndongled erzeugten Zabbix-Konfigs (keine Rückfrage)
+- Gebaut mit Go 1.27.4 (Sicherheitskorrekturen der Standardbibliothek)
+
 ## v0.2.1
 
 - Routenwechsel kommen sofort beim PC an: Ändern sich die per DHCP verteilten Routen (VPN-Art,

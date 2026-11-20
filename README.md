@@ -53,7 +53,7 @@ Der Engpass ist das 2,4-GHz-WLAN des Sticks (WCN3620, ~4–7 Mbit/s), nicht CPU 
 | Status | Uplink, WLAN-Signal, LTE, VPN, **CPU/RAM gemittelt über 60 s**, **Temperatur** (CPU/Modem, Drosselgrenze); alles auch als `status.json` |
 | Ressourcen | RDP-Dateien, Links, SSH, Datei-Downloads vom Stick |
 | Konfig | Export/Import verschlüsselt (BHVPN1, kompatibel zum ESP und zu `tools/admin.ps1`), Config-Server |
-| Zabbix 7.0 | aktiver Proxy + Agent durch den Tunnel ([docs/zabbix.md](docs/zabbix.md), Vorlage in `zabbix/`) |
+| Zabbix 7.4 | aktiver Proxy + Agent durch den Tunnel ([docs/zabbix.md](docs/zabbix.md), Vorlage in `zabbix/`) |
 | Updates | Debian/Zabbix wöchentlich oder per Knopf; **Selbst-Update aus GitHub-Releases mit Ed25519-Signatur** |
 | Härtung des Images | neue machine-id und SSH-Host-Schlüssel, Image-Konten/Hotspot/Gadget aus ([system/harden-base.sh](system/harden-base.sh)) |
 

@@ -1,6 +1,7 @@
 #!/bin/sh
 # vpndongle-update – aktualisiert den Stick:
-#   1. Debian- und Zabbix-Pakete (apt upgrade, Zabbix bleibt auf 7.0)
+#   1. Debian- und Zabbix-Pakete (apt upgrade, Zabbix bleibt in seiner Reihe; eine
+#      neue Reihe bringt install.sh eines neuen Pakets mit)
 #   2. VPN-Dongle-Software: neueres signiertes GitHub-Release (falls eingeschaltet)
 #      oder ein hochgeladenes Paket (/var/lib/vpndongle/update/)
 #

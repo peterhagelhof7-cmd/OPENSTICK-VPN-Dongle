@@ -84,7 +84,7 @@ und umgekehrt. Import mit Merge-Semantik: Fehlende Bereiche bleiben erhalten.
 
 ## Zabbix
 
-Aktiver Proxy + Agent (Zabbix 7.0 aus repo.zabbix.com, Debian 12/13 arm64), Details in [zabbix.md](zabbix.md).
+Aktiver Proxy + Agent (Zabbix 7.4 aus repo.zabbix.com, Debian 12/13 arm64), Details in [zabbix.md](zabbix.md).
 - Der Agent fragt `vpndongled -zbx …` über Loopback ab. Er läuft als Benutzer `zabbix` und darf die Konfig
   nicht lesen, deshalb liefert der Dienst Status und Discovery nur an 127.0.0.1.
 - Was überwacht wird, steuert die LLD. Die Schalter in der Weboberfläche ändern nur die Discovery-Antwort,

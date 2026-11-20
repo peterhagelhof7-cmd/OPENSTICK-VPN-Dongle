@@ -112,7 +112,7 @@ Paket `vpndongle-<version>.tar.gz` aus den [Releases](https://github.com/peterha
 
 oder von Hand: Paket nach `/root` kopieren, entpacken, `sh install.sh` als root.
 
-`install.sh` installiert die Pakete (u. a. Zabbix 7.0 sowie die Clients von NetBird und Tailscale aus
+`install.sh` installiert die Pakete (u. a. Zabbix 7.4 sowie die Clients von NetBird und Tailscale aus
 deren offiziellen Repositorys – die laufen nur, wenn sie als VPN-Art gewählt sind), setzt die Zeitzone
 `Europe/Berlin` und
 **härtet das Image** (`system/harden-base.sh`): neue machine-id und SSH-Host-Schlüssel, leeres
