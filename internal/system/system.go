@@ -48,6 +48,10 @@ func (r Real) run(stdin *strings.Reader, name string, args ...string) (string, e
 	defer cancel()
 	var out, errb bytes.Buffer
 	cmd := exec.CommandContext(ctx, name, args...)
+	// UTF-8 für alle Werkzeuge: Ohne Locale (systemd setzt keins) gibt mmcli jedes
+	// Nicht-ASCII-Zeichen als „?“ aus – SMS „Grüße“ kam als „Gr??e“ an (26.11.2026).
+	// C.UTF-8 lässt die Meldungen englisch, die Parser bleiben gültig.
+	cmd.Env = append(os.Environ(), "LC_ALL=C.UTF-8")
 	cmd.Stdout, cmd.Stderr = &out, &errb
 	if stdin != nil {
 		cmd.Stdin = stdin

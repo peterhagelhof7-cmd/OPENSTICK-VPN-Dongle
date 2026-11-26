@@ -128,6 +128,7 @@ func TestSMSSendChecks(t *testing.T) {
 	a, fs := smsApp(t)
 	for _, c := range []struct{ num, text string }{
 		{"abc", "x"}, {"12", "x"}, {"+491511234567", ""}, {"+491511234567", strings.Repeat("ä", SMSMaxText+1)},
+		{"+491511234567", "Gr" + string([]byte{0xfc, 0xdf}) + "e"}, // cp1252 statt UTF-8
 	} {
 		if err := a.SMSSend(c.num, c.text); err == nil {
 			t.Errorf("%q/%d Zeichen: Fehler erwartet", c.num, len(c.text))
@@ -184,5 +185,64 @@ func TestResetWipesSMS(t *testing.T) {
 	}
 	if err := a.Reset("lte"); err != nil || len(a.SMSMessages()) != 0 {
 		t.Fatal("LTE-Reset muss SMS löschen")
+	}
+}
+
+// UZ801: dieselbe SMS als zwei Modem-Objekte, Löschen scheitert -> nur einmal in der Ablage.
+func TestSMSPollNoDuplicates(t *testing.T) {
+	a, fs := smsApp(t)
+	fs.out["mmcli -m any --messaging-list-sms"] = `{"modem.messaging.sms":["` + smsPath + `3","` + smsPath + `4"]}`
+	fs.out["mmcli -s "+smsPath+"3"] = smsJSON("received", "deliver", "Test2 ok")
+	fs.out["mmcli -s "+smsPath+"4"] = smsJSON("received", "deliver", "Test2 ok")
+	fs.fail["mmcli -m any --messaging-delete-sms="] = errors.New("Couldn't delete 1 parts from this SMS")
+	now := time.Now()
+	a.smsPoll(a.Status(), now)
+	a.smsPoll(a.Status(), now.Add(smsPollEvery)) // liegt noch im Modem
+	if l := a.SMSMessages(); len(l) != 1 || l[0].Text != "Test2 ok" {
+		t.Fatalf("%d Einträge: %+v", len(l), l)
+	}
+	// gleicher Text, anderer Zeitstempel = neue SMS
+	fs.out["mmcli -s "+smsPath+"4"] = strings.Replace(smsJSON("received", "deliver", "Test2 ok"), "10:11:12", "10:12:00", 1)
+	a.smsPoll(a.Status(), now.Add(2*smsPollEvery))
+	if l := a.SMSMessages(); len(l) != 2 {
+		t.Fatalf("%d Einträge", len(l))
+	}
+}
+
+// Erster Sendeversuch scheitert, zweiter geht: eine SMS, ohne Fehler.
+func TestSMSSendRetry(t *testing.T) {
+	a, fs := smsApp(t)
+	fs.out["mmcli -m any --messaging-create-sms"] = "Successfully created new SMS: " + smsPath + "5\n"
+	sends := 0
+	fs.fail["mmcli -s "+smsPath+"5 --send"] = errors.New("Timeout was reached")
+	fs.hook = func(c string) {
+		if strings.HasSuffix(c, "--send") {
+			sends++
+			fs.mu.Lock()
+			delete(fs.fail, "mmcli -s "+smsPath+"5 --send") // ab jetzt klappt es
+			fs.mu.Unlock()
+		}
+	}
+	if err := a.SMSSend("+4915112345678", "Grüße äöü ß€@"); err != nil {
+		t.Fatal(err)
+	}
+	if sends != 2 {
+		t.Fatalf("%d Sendeversuche", sends)
+	}
+	if l := a.SMSMessages(); len(l) != 1 || l[0].Error != "" || l[0].Text != "Grüße äöü ß€@" {
+		t.Fatalf("%+v", l)
+	}
+	// Modem nimmt sie gar nicht an: kein zweiter Versuch
+	b, fs2 := smsApp(t)
+	fs2.fail["mmcli -m any --messaging-create-sms"] = errors.New("x")
+	_ = b.SMSSend("+4915112345678", "x")
+	n := 0
+	for _, c := range fs2.take() {
+		if strings.Contains(c, "--messaging-create-sms") {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Fatalf("%d Anlegeversuche", n)
 	}
 }

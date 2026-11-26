@@ -97,6 +97,17 @@ func (a *App) smsAdd(m SMSMsg) {
 	a.smsList = append(a.smsList, m)
 }
 
+// smsHave: liegt diese empfangene SMS (Absender, Text, Zeitstempel der Zentrale) schon in
+// der Ablage? Aufrufer hält smsMu.
+func (a *App) smsHave(m SMSMsg) bool {
+	for _, x := range a.smsList {
+		if x.In && x.Number == m.Number && x.Text == m.Text && x.Time.Equal(m.Time) {
+			return true
+		}
+	}
+	return false
+}
+
 // smsPoll holt empfangene SMS vom Modem. Aus tick, nur wenn SMS aktiv.
 func (a *App) smsPoll(s Status, now time.Time) {
 	if now.Sub(a.smsLastPoll) < smsPollEvery {
@@ -138,14 +149,24 @@ func (a *App) smsPoll(s Status, now time.Time) {
 	}
 	a.smsMu.Lock()
 	a.smsLoad()
+	added := 0
 	for _, m := range got {
 		t := m.Time
 		if t.IsZero() {
 			t = now
 		}
-		a.smsAdd(SMSMsg{In: true, Number: m.Number, Text: m.Text, Time: t})
+		in := SMSMsg{In: true, Number: m.Number, Text: m.Text, Time: t}
+		// Dieselbe SMS nur einmal: ModemManager führte eine SMS als zwei Objekte, und
+		// scheitert das Löschen im Modem, kommt sie beim nächsten Abruf wieder (UZ801).
+		if !m.Time.IsZero() && a.smsHave(in) {
+			continue
+		}
+		a.smsAdd(in)
+		added++
 	}
-	err = a.smsSave()
+	if added > 0 {
+		err = a.smsSave()
+	}
 	a.smsMu.Unlock()
 	if err != nil {
 		// Erst sicher in der eigenen Ablage, dann im Modem löschen
@@ -157,7 +178,11 @@ func (a *App) smsPoll(s Status, now time.Time) {
 			log.Printf("SMS im Modem löschen: %v", err)
 		}
 	}
-	log.Printf("SMS: %d neue empfangen", len(got))
+	if dup := len(got) - added; dup > 0 {
+		log.Printf("SMS: %d neue empfangen, %d schon in der Ablage", added, dup)
+	} else {
+		log.Printf("SMS: %d neue empfangen", added)
+	}
 }
 
 // SMSMessages liefert die Ablage, neueste zuerst.
@@ -235,6 +260,11 @@ func (a *App) SMSSend(number, text string) error {
 	if text == "" {
 		return errors.New("Text ist leer")
 	}
+	// Ungültige Bytes (z. B. Text im Windows-Zeichensatz per Skript) lehnt das Modem nur
+	// mit „nicht angenommen“ ab – lieber gleich sagen, was los ist.
+	if !utf8.ValidString(text) {
+		return errors.New("Text ist kein gültiges UTF-8 (Zeichensatz prüfen)")
+	}
 	if n := utf8.RuneCountInString(text); n > SMSMaxText {
 		return fmt.Errorf("Text zu lang (%d von max. %d Zeichen)", n, SMSMaxText)
 	}
@@ -275,17 +305,43 @@ func (a *App) SMSSend(number, text string) error {
 	return sendErr
 }
 
+// smsSendTries/smsRetryWait: Der erste Versuch scheiterte am UZ801 einmal mit
+// „WmsMessageDeliveryFailure“ (mmcli: Timeout), der zweite kurz danach ging (26.11.2026).
+// Nur ein Wiederholen: Meldet das Modem einen Fehler, obwohl die SMS doch rausging, käme
+// sie sonst mehrfach an.
+const (
+	smsSendTries = 2
+	smsRetryWait = 10 * time.Second
+)
+
 func (a *App) smsModemSend(number, text string) error {
+	var err error
+	for i := 1; i <= smsSendTries; i++ {
+		if i > 1 {
+			log.Printf("SMS senden: Versuch %d in %s", i, smsRetryWait)
+			a.sleep(smsRetryWait)
+		}
+		var created bool
+		if created, err = a.smsModemSendOnce(number, text); err == nil || !created {
+			return err // geschafft, oder das Modem nahm sie gar nicht an (kein Netzproblem)
+		}
+	}
+	return err
+}
+
+// smsModemSendOnce legt die SMS im Modem an und sendet sie. created = angelegt (ein Fehler
+// danach ist einer beim Senden und lohnt einen zweiten Versuch).
+func (a *App) smsModemSendOnce(number, text string) (created bool, err error) {
 	out, err := a.Sys.Run("mmcli", "-m", "any", system.SMSCreateArg(number, text))
 	if err != nil {
-		return errors.New("Modem hat die SMS nicht angenommen")
+		return false, errors.New("Modem hat die SMS nicht angenommen")
 	}
 	p := system.ParseCreatedSMS(out)
 	if p == "" {
 		if a.Sys.DryRun() {
-			return nil
+			return false, nil
 		}
-		return errors.New("Modem hat die SMS nicht angelegt")
+		return false, errors.New("Modem hat die SMS nicht angelegt")
 	}
 	_, err = a.Sys.Run("mmcli", "-s", p, "--send")
 	// Entwurf/Gesendetes im Modem nicht aufheben – die Ablage ist im Stick
@@ -294,7 +350,7 @@ func (a *App) smsModemSend(number, text string) error {
 	}
 	if err != nil {
 		log.Printf("SMS senden: %v", err)
-		return errors.New("Senden fehlgeschlagen (Netz, Guthaben oder Nummer prüfen)")
+		return true, errors.New("Senden fehlgeschlagen (Netz, Guthaben oder Nummer prüfen)")
 	}
-	return nil
+	return true, nil
 }

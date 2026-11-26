@@ -4,6 +4,8 @@ After=vpndongle-gadget.service NetworkManager.service ModemManager.service nftab
 Wants=vpndongle-gadget.service NetworkManager.service ModemManager.service
 
 [Service]
+# UTF-8: mmcli gibt sonst Umlaute als „?“ aus (SMS)
+Environment=LANG=C.UTF-8
 ExecStart=/usr/local/bin/vpndongled
 Restart=always
 RestartSec=3

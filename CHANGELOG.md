@@ -27,6 +27,13 @@ Aus dem ersten Test mit SIM (UZ801, PremiumSIM im Vodafone-Netz):
   `ipv4.icanhazip.com` bzw. `ipv6.icanhazip.com`; bei LTE hinter CGNAT gibt es die öffentliche IPv4 nur so.
   Auch in `status.json` (`ext_ipv4`, `ext_ipv6`)
 - Eigene Rufnummer von der SIM mit „+“: die SIM meldet sie international, aber ohne Plus („4915…“)
+- **SMS-Umlaute kamen als „?“ an** („Gr??e“): Der Dienst rief `mmcli` ohne Locale auf (systemd setzt keins),
+  dann ersetzt es jedes Nicht-ASCII-Zeichen. Alle Werkzeuge laufen jetzt mit `LC_ALL=C.UTF-8`, die Unit setzt
+  zusätzlich `LANG=C.UTF-8`. Text mit ungültigen Zeichen (kein UTF-8) wird beim Senden gleich abgelehnt
+- **Empfangene SMS doppelt und dreifach in der Ablage:** ModemManager führte eine SMS als zwei Objekte, und
+  scheiterte das Löschen im Modem, kam sie beim nächsten Abruf erneut. Gleicher Absender, Text und
+  Zeitstempel landen jetzt nur einmal in der Ablage
+- **SMS senden:** scheitert der Versand im Netz, versucht der Stick es nach 10 s ein zweites Mal
 
 ## v0.3.0
 
