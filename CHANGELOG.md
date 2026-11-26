@@ -1,6 +1,6 @@
 # Änderungen
 
-## v0.3.1 (unveröffentlicht)
+## v0.3.1
 
 Aus dem ersten Test mit SIM (UZ801, PremiumSIM im Vodafone-Netz):
 - **LTE-Daten scheiterten endlos** mit „multiple-connection-to-same-pdn-not-allowed“: Die Werks-Firmware
