@@ -26,6 +26,7 @@ Aus dem ersten Test mit SIM (UZ801, PremiumSIM im Vodafone-Netz):
 - **Externe IP (IPv4 und IPv6) im Status:** alle 10 min und bei jedem Wechsel von Uplink/VPN/WLAN über
   `ipv4.icanhazip.com` bzw. `ipv6.icanhazip.com`; bei LTE hinter CGNAT gibt es die öffentliche IPv4 nur so.
   Auch in `status.json` (`ext_ipv4`, `ext_ipv6`)
+- Eigene Rufnummer von der SIM mit „+“: die SIM meldet sie international, aber ohne Plus („4915…“)
 
 ## v0.3.0
 

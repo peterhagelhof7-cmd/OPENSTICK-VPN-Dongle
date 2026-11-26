@@ -86,3 +86,21 @@ func TestRedact(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestIntlNumber(t *testing.T) {
+	for in, want := range map[string]string{
+		"4915112345678":  "+4915112345678",
+		"+4915112345678": "+4915112345678",
+		"015112345678":   "015112345678",
+		"1234":           "1234",
+		"49 151 123":     "49 151 123",
+	} {
+		if got := intlNumber(in); got != want {
+			t.Errorf("%q -> %q, erwartet %q", in, got, want)
+		}
+	}
+	s := ParseMMCLI(`{"modem":{"generic":{"state":"registered","own-numbers":["4915112345678"]},"3gpp":{}}}`)
+	if s.Number != "+4915112345678" {
+		t.Fatal(s.Number)
+	}
+}

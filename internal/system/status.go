@@ -244,7 +244,7 @@ func ParseMMCLI(out string) LTEStatus {
 	s.Signal, _ = strconv.Atoi(g.SignalQuality.Value)
 	for _, n := range g.OwnNumbers {
 		if n = strings.TrimSpace(n); n != "" && n != "--" {
-			s.Number = n
+			s.Number = intlNumber(n)
 			break
 		}
 	}
@@ -287,4 +287,19 @@ func ParseBearer(out string) BearerStats {
 		s.RX, s.TX, s.OK = rx, tx, true
 	}
 	return s
+}
+
+// intlNumber: Die SIM meldet die eigene Nummer international, aber ohne „+“
+// („4915…“, UZ801 26.11.2026). Nur Ziffern, nicht mit 0 beginnend (sonst national)
+// und lang genug -> „+“ davor. Alles andere bleibt, wie es ist.
+func intlNumber(n string) string {
+	if len(n) < 8 || n[0] == '0' {
+		return n
+	}
+	for _, r := range n {
+		if r < '0' || r > '9' {
+			return n
+		}
+	}
+	return "+" + n
 }
