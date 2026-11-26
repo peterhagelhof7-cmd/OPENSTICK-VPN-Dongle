@@ -78,7 +78,9 @@ func NMKeyfiles(n Net, c *config.Config) []NMFile {
 		p("uuid=%s", uuidFor(LTEConnName))
 		p("type=gsm")
 		p("autoconnect=%t", c.Uplink == config.UplinkLTE)
-		p("autoconnect-retries=0")
+		// Nicht 0 (= endlos ohne Pause): Scheitert der Aufbau, versucht NM es 3-mal und
+		// wartet dann 5 min. Mit 0 liefen am UZ801 ~6 Versuche/s (Last 3, Log voll).
+		p("autoconnect-retries=3")
 		p("")
 		p("[gsm]")
 		p("apn=%s", keyfileEscape(c.LTE.APN))

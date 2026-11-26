@@ -2,6 +2,7 @@ package system
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -164,6 +165,19 @@ type LTEStatus struct {
 	Signal     int    `json:"signal"`           // 0–100 %
 	IMEI       string `json:"-"`                // bewusst nicht in API/Log
 	Number     string `json:"number,omitempty"` // eigene Rufnummer, wenn die SIM sie meldet
+	// Note: Hinweis ohne Sperre, z. B. PIN2 bei aktiver Rufnummernbeschränkung (FDN)
+	Note       string `json:"note,omitempty"`
+	PINRetries int    `json:"pin_retries"` // verbleibende PIN1-Versuche, -1 = unbekannt
+	SIMPath    string `json:"-"`           // D-Bus-Pfad der SIM (zum Entsperren)
+	QMIPort    string `json:"-"`           // z. B. wwan0qmi0, "" = kein QMI-Modem
+}
+
+// Sperren, die das Modem nicht blockieren: PIN2/PUK2 schützen nur die
+// Rufnummernbeschränkung (FDN). ModemManager meldet sie als „unlock-required“,
+// obwohl Einbuchen, Daten und SMS-Empfang gehen (UZ801, 26.11.2026).
+var nonBlockingLocks = map[string]string{
+	"sim-pin2": "PIN2 aktiv (Rufnummernbeschränkung) – für Internet und SMS-Empfang nicht nötig",
+	"sim-puk2": "PUK2 nötig (Rufnummernbeschränkung) – für Internet und SMS-Empfang nicht nötig",
 }
 
 func ParseMMCLI(out string) LTEStatus {
@@ -173,6 +187,9 @@ func ParseMMCLI(out string) LTEStatus {
 				State         string   `json:"state"`
 				FailedReason  string   `json:"state-failed-reason"`
 				Unlock        string   `json:"unlock-required"`
+				UnlockRetries []string `json:"unlock-retries"` // "sim-pin (3)"
+				SIM           string   `json:"sim"`
+				PrimaryPort   string   `json:"primary-port"`
 				AccessTech    []string `json:"access-technologies"`
 				OwnNumbers    []string `json:"own-numbers"`
 				SignalQuality struct {
@@ -195,7 +212,24 @@ func ParseMMCLI(out string) LTEStatus {
 		s.Failed = g.FailedReason
 	}
 	if g.Unlock != "--" && g.Unlock != "none" {
-		s.Unlock = g.Unlock
+		if note, ok := nonBlockingLocks[g.Unlock]; ok {
+			s.Note = note
+		} else {
+			s.Unlock = g.Unlock
+		}
+	}
+	s.PINRetries = -1
+	for _, r := range g.UnlockRetries {
+		var n int
+		if _, err := fmt.Sscanf(strings.TrimSpace(r), "sim-pin (%d)", &n); err == nil {
+			s.PINRetries = n
+		}
+	}
+	if g.SIM != "" && g.SIM != "--" && g.SIM != "/" {
+		s.SIMPath = g.SIM
+	}
+	if strings.Contains(g.PrimaryPort, "qmi") {
+		s.QMIPort = g.PrimaryPort
 	}
 	if s.Operator == "--" {
 		s.Operator = ""

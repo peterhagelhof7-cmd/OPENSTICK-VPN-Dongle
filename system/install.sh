@@ -46,7 +46,7 @@ say "Pakete"
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
 	wireguard-tools dnsmasq-base nftables network-manager modemmanager iproute2 \
-	ca-certificates wget fping util-linux openssh-server
+	ca-certificates wget fping util-linux openssh-server libqmi-utils
 # Die System-dnsmasq (falls vorhanden) würde mit unserer Instanz kollidieren
 if systemctl list-unit-files dnsmasq.service >/dev/null 2>&1; then
 	systemctl disable --now dnsmasq.service 2>/dev/null || true

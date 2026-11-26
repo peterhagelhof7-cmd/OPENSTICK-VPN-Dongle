@@ -2,6 +2,7 @@ package system
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -46,7 +47,16 @@ func TestParseMMCLI(t *testing.T) {
 	"access-technologies":["lte"],"signal-quality":{"value":"63","recent":"yes"}},
 	"3gpp":{"operator-name":"Telekom.de","registration-state":"home","imei":"123"}}}`
 	s := ParseMMCLI(out)
-	if !s.Present || s.State != "connected" || s.Signal != 63 || s.Tech != "lte" || s.Operator != "Telekom.de" || s.Unlock != "sim-pin2" {
+	// PIN2 sperrt nichts (nur Rufnummernbeschränkung): Hinweis statt „nötig“
+	if !s.Present || s.State != "connected" || s.Signal != 63 || s.Tech != "lte" || s.Operator != "Telekom.de" || s.Unlock != "" ||
+		!strings.Contains(s.Note, "PIN2") || s.PINRetries != -1 || s.QMIPort != "" || s.SIMPath != "" {
+		t.Fatalf("%+v", s)
+	}
+	// echte Felder am UZ801 (26.11.2026)
+	s = ParseMMCLI(`{"modem":{"generic":{"state":"locked","state-failed-reason":"--","unlock-required":"sim-pin",
+	"unlock-retries":["sim-pin (3)","sim-puk (10)","sim-pin2 (3)","sim-puk2 (10)"],
+	"sim":"/org/freedesktop/ModemManager1/SIM/0","primary-port":"wwan0qmi0","signal-quality":{"value":"0"}},"3gpp":{}}}`)
+	if s.Unlock != "sim-pin" || s.Note != "" || s.PINRetries != 3 || s.SIMPath != "/org/freedesktop/ModemManager1/SIM/0" || s.QMIPort != "wwan0qmi0" {
 		t.Fatalf("%+v", s)
 	}
 	if ParseMMCLI("error: couldn't find modem").Present {

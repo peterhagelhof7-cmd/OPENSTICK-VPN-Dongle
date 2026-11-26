@@ -1,5 +1,23 @@
 # Änderungen
 
+## v0.3.1 (unveröffentlicht)
+
+Aus dem ersten Test mit SIM (UZ801, PremiumSIM im Vodafone-Netz):
+- **LTE-Daten scheiterten endlos** mit „multiple-connection-to-same-pdn-not-allowed“: Die Werks-Firmware
+  bucht mit Profil „qdp_profile“ und dem APN „ctlte“ (China Telecom) ein, das Netz baut dabei schon die
+  Standard-Verbindung auf, und die zweite zum selben APN lehnt es ab. Der Stick gleicht jetzt das
+  Einbuchungs-Profil selbst ab: Hat genau ein Profil einen fremden APN und keines den eingestellten,
+  bekommt es den eingestellten APN (per `qmicli`, ModemManager kann das bei diesem Modem nicht), danach
+  schaltet der Stick den Funk aus und wieder an (bucht neu ein) und verbindet bei Uplink LTE sofort; am
+  UZ801 ~20 s vom Erkennen bis zur Verbindung. Neues Paket `libqmi-utils`
+- **SIM-PIN auch ohne LTE-Uplink:** NetworkManager gab die PIN nur beim Aufbau der LTE-Verbindung ein, im
+  reinen WLAN-Betrieb blieb die SIM nach einem Neustart gesperrt (keine SMS). Der Stick entsperrt jetzt
+  selbst mit der eingestellten PIN: höchstens ein Versuch je PIN, nie mit dem letzten verbleibenden Versuch
+- **„sim-pin2 nötig“ war ein Fehlalarm:** PIN2 schützt nur die Rufnummernbeschränkung (FDN), Einbuchen,
+  Daten und SMS-Empfang gehen ohne. Der Status zeigt das als grauen Hinweis
+- **Kein Verbindungs-Dauerfeuer mehr:** Das LTE-Profil versuchte es endlos ohne Pause (am UZ801 ~6 Versuche
+  pro Sekunde, CPU-Last 3, Journal voll); jetzt 3 Versuche, dann 5 Minuten Pause
+
 ## v0.3.0
 
 - **SMS über die Weboberfläche:** neue Seite „SMS“ (Kopfzeile, ohne Login wie die Übersicht) zum Lesen und

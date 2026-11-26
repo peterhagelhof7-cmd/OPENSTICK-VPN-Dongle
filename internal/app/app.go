@@ -153,6 +153,16 @@ type App struct {
 	lteLastTry                 time.Time
 	lteBusy                    atomic.Bool
 
+	// Modem-Pflege (modem.go): PIN1 entsperren, Einbuchungs-Profil abgleichen
+	modemBusy     atomic.Bool
+	modemMu       sync.Mutex
+	pinFailed     [32]byte // Hash der zuletzt gescheiterten PIN (nie die PIN selbst)
+	pinLastTry    time.Time
+	pinWarned     bool
+	attachDone    string // APN, für den die Profile geprüft/abgeglichen sind
+	attachLastTry time.Time
+	sleep         func(time.Duration) // time.Sleep; Tests: no-op
+
 	uplinkSince time.Time
 	cfgChecked  bool
 	startedAt   time.Time
@@ -172,7 +182,7 @@ type App struct {
 func New(store *config.Store, sys system.Sys, version string) *App {
 	return &App{
 		Store: store, Sys: sys, Net: render.DefaultNet(), Version: version,
-		hashes: map[string][32]byte{}, leds: led.Find(sys), startedAt: time.Now(),
+		hashes: map[string][32]byte{}, leds: led.Find(sys), startedAt: time.Now(), sleep: time.Sleep,
 		status: Status{CfgAvail: -1, HandshakeAge: -1, Version: version, CPUPct: -1, RAMPct: -1, CPUTemp: -1, ModemTemp: -1},
 	}
 }
@@ -527,6 +537,7 @@ func (a *App) tick() {
 		_ = a.Apply()
 	}
 
+	a.modemCare(c, ns.LTE, now)
 	a.lteFallback(c, ns, now)
 	a.updateLED(ns)
 	if SMSActive(c) {

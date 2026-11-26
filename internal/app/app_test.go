@@ -107,7 +107,9 @@ func newTestApp(t *testing.T) (*App, *fakeSys) {
 		t.Fatal(err)
 	}
 	fs := newFake()
-	return New(st, fs, "test"), fs
+	a := New(st, fs, "test")
+	a.sleep = func(time.Duration) {}
+	return a, fs
 }
 
 func TestApplyIdempotent(t *testing.T) {
