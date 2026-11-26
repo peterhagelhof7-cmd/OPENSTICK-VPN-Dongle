@@ -109,6 +109,7 @@ func newTestApp(t *testing.T) (*App, *fakeSys) {
 	fs := newFake()
 	a := New(st, fs, "test")
 	a.sleep = func(time.Duration) {}
+	a.extFetch = func(string, string) (string, error) { return "", os.ErrNotExist } // nie ins Internet
 	return a, fs
 }
 

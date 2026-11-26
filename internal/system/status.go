@@ -170,6 +170,7 @@ type LTEStatus struct {
 	PINRetries int    `json:"pin_retries"` // verbleibende PIN1-Versuche, -1 = unbekannt
 	SIMPath    string `json:"-"`           // D-Bus-Pfad der SIM (zum Entsperren)
 	QMIPort    string `json:"-"`           // z. B. wwan0qmi0, "" = kein QMI-Modem
+	Bearers    []string `json:"-"`           // D-Bus-Pfade der Bearer (Datenzähler)
 }
 
 // Sperren, die das Modem nicht blockieren: PIN2/PUK2 schützen nur die
@@ -190,6 +191,7 @@ func ParseMMCLI(out string) LTEStatus {
 				UnlockRetries []string `json:"unlock-retries"` // "sim-pin (3)"
 				SIM           string   `json:"sim"`
 				PrimaryPort   string   `json:"primary-port"`
+				Bearers       []string `json:"bearers"`
 				AccessTech    []string `json:"access-technologies"`
 				OwnNumbers    []string `json:"own-numbers"`
 				SignalQuality struct {
@@ -228,6 +230,7 @@ func ParseMMCLI(out string) LTEStatus {
 	if g.SIM != "" && g.SIM != "--" && g.SIM != "/" {
 		s.SIMPath = g.SIM
 	}
+	s.Bearers = g.Bearers
 	if strings.Contains(g.PrimaryPort, "qmi") {
 		s.QMIPort = g.PrimaryPort
 	}
@@ -244,6 +247,44 @@ func ParseMMCLI(out string) LTEStatus {
 			s.Number = n
 			break
 		}
+	}
+	return s
+}
+
+// BearerStats aus `mmcli -b <pfad> -J`: verbunden, Schnittstelle und Bytes seit
+// Verbindungsbeginn (vom Modem). ok = Zähler vorhanden.
+type BearerStats struct {
+	Connected bool
+	Iface     string
+	RX, TX    int64
+	OK        bool
+}
+
+func ParseBearer(out string) BearerStats {
+	var raw struct {
+		Bearer struct {
+			Status struct {
+				Connected string `json:"connected"`
+				Interface string `json:"interface"`
+			} `json:"status"`
+			Stats struct {
+				RX string `json:"bytes-rx"`
+				TX string `json:"bytes-tx"`
+			} `json:"stats"`
+		} `json:"bearer"`
+	}
+	if json.Unmarshal([]byte(out), &raw) != nil {
+		return BearerStats{}
+	}
+	b := raw.Bearer
+	s := BearerStats{Connected: b.Status.Connected == "yes", Iface: b.Status.Interface}
+	if s.Iface == "--" {
+		s.Iface = ""
+	}
+	rx, err1 := strconv.ParseInt(b.Stats.RX, 10, 64)
+	tx, err2 := strconv.ParseInt(b.Stats.TX, 10, 64)
+	if err1 == nil && err2 == nil {
+		s.RX, s.TX, s.OK = rx, tx, true
 	}
 	return s
 }

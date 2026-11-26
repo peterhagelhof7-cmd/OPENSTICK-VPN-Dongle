@@ -17,6 +17,15 @@ Aus dem ersten Test mit SIM (UZ801, PremiumSIM im Vodafone-Netz):
   Daten und SMS-Empfang gehen ohne. Der Status zeigt das als grauen Hinweis
 - **Kein Verbindungs-Dauerfeuer mehr:** Das LTE-Profil versuchte es endlos ohne Pause (am UZ801 ~6 Versuche
   pro Sekunde, CPU-Last 3, Journal voll); jetzt 3 Versuche, dann 5 Minuten Pause
+- **LTE-Datenverbrauch im Status:** aktuelle Sitzung (seit LTE verbunden) und laufender Kalendermonat mit
+  ↓/↑, dazu die letzten 6 Vormonate. Gezählt vom Modem (ModemManager, Bytes der Verbindung; am UZ801 zählt
+  der Treiber an `wwan0` nichts), sonst an der LTE-Schnittstelle; gespeichert in
+  `/var/lib/vpndongle/lte-usage.json` (24 Monate, höchstens alle 5 min geschrieben, beim Sitzungsende und
+  Beenden sofort); Zurücksetzen „alles“ löscht die Zahlen. Auch in `status.json` (`lte_session_*`,
+  `lte_month`, `lte_months`). Der Zähler misst am Stick – die Abrechnung des Anbieters kann abweichen
+- **Externe IP (IPv4 und IPv6) im Status:** alle 10 min und bei jedem Wechsel von Uplink/VPN/WLAN über
+  `ipv4.icanhazip.com` bzw. `ipv6.icanhazip.com`; bei LTE hinter CGNAT gibt es die öffentliche IPv4 nur so.
+  Auch in `status.json` (`ext_ipv4`, `ext_ipv6`)
 
 ## v0.3.0
 

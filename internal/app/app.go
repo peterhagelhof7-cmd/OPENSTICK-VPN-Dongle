@@ -121,6 +121,16 @@ type Status struct {
 	ModemTemp  float64            `json:"modem_temp_c"`
 	ThrottleAt float64            `json:"throttle_c"`
 	Temps      map[string]float64 `json:"temps_c,omitempty"`
+	// LTE-Datenverbrauch (usage.go): Sitzung = seit LTE verbunden; Monate neueste zuerst
+	LTEIface     string       `json:"lte_iface,omitempty"`
+	LTESessSince time.Time    `json:"lte_session_since"`
+	LTESessRX    int64        `json:"lte_session_rx"`
+	LTESessTX    int64        `json:"lte_session_tx"`
+	LTEMonth     MonthUsage   `json:"lte_month"`
+	LTEMonths    []MonthUsage `json:"lte_months,omitempty"`
+	// externe IP des Sticks (IP-Echo-Dienst), "" = unbekannt/keine
+	ExtIPv4 string `json:"ext_ipv4"`
+	ExtIPv6 string `json:"ext_ipv6"`
 }
 
 type App struct {
@@ -177,12 +187,22 @@ type App struct {
 	smsSent      []time.Time
 	smsLastPoll  time.Time
 	smsEnableTry time.Time
+
+	// LTE-Verbrauch (usage.go, nur aus tick) und externe IP
+	usage         usageState
+	usageResetReq atomic.Bool
+	extMu         sync.Mutex
+	extV4, extV6  string
+	extAt         time.Time
+	extUplink     string // Weg (Uplink/VPN) beim letzten Abruf
+	extBusy       atomic.Bool
+	extFetch      func(network, url string) (string, error) // fetchExtIP; Tests: Attrappe
 }
 
 func New(store *config.Store, sys system.Sys, version string) *App {
 	return &App{
 		Store: store, Sys: sys, Net: render.DefaultNet(), Version: version,
-		hashes: map[string][32]byte{}, leds: led.Find(sys), startedAt: time.Now(), sleep: time.Sleep,
+		hashes: map[string][32]byte{}, leds: led.Find(sys), startedAt: time.Now(), sleep: time.Sleep, extFetch: fetchExtIP,
 		status: Status{CfgAvail: -1, HandshakeAge: -1, Version: version, CPUPct: -1, RAMPct: -1, CPUTemp: -1, ModemTemp: -1},
 	}
 }
@@ -430,6 +450,9 @@ func (a *App) Run(stop <-chan struct{}) {
 		select {
 		case <-stop:
 			a.leds.Set(led.Off)
+			if a.usage.dirty { // Neustart/Update: LTE-Verbrauch nicht verlieren
+				a.usageSave(time.Now())
+			}
 			return
 		case <-t.C:
 		}
@@ -447,12 +470,13 @@ func (a *App) tick() {
 		a.setErr(err)
 	}
 	ns.WLANUp, ns.LTEUp = false, false
+	gsmDev := ""
 	for _, d := range system.ParseDevices(out) {
 		switch {
 		case d.Name == a.Net.WLANIface && d.Connected():
 			ns.WLANUp = true
 		case d.Type == "gsm" && d.Connected():
-			ns.LTEUp = true
+			ns.LTEUp, gsmDev = true, d.Name
 		}
 	}
 	ns.WLANSSID, ns.WLANSignal = "", 0
@@ -522,6 +546,8 @@ func (a *App) tick() {
 	}
 	a.sampleLoad(now, &ns)
 	a.sampleThermal(&ns)
+	a.sampleUsage(now, ns.LTEUp, gsmDev, ns.LTE, &ns)
+	a.sampleExtIP(now, ns.Uplink, fmt.Sprintf("%s|%v|%s", ns.Uplink, ns.VPNUp, ns.WLANSSID), &ns)
 	ns.Updated = now
 
 	a.mu.Lock()
@@ -742,6 +768,9 @@ func (a *App) Reset(scope string) error {
 		a.wipeOverlayState(k)
 	}
 	// SMS sind persönliche Daten: mit dem LTE-Zugang bzw. „alles“ mit weg
+	if err == nil && scope == "all" {
+		a.usageReset()
+	}
 	if err == nil && (scope == "all" || scope == "lte") {
 		if derr := a.SMSDelete(0); derr != nil {
 			log.Printf("SMS-Ablage löschen: %v", derr)
