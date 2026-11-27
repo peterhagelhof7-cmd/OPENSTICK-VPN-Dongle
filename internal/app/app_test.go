@@ -126,7 +126,7 @@ func TestApplyIdempotent(t *testing.T) {
 		t.Fatal(err)
 	}
 	cmds := fs.take()
-	for _, want := range []string{"nmcli connection reload", "systemctl restart wg-quick@wg0",
+	for _, want := range []string{"nmcli connection reload", "systemctl restart --no-block wg-quick@wg0",
 		"systemctl restart vpndongle-dnsmasq", "nft -f " + NftFile} {
 		if !has(cmds, want) {
 			t.Errorf("Befehl fehlt: %q in %q", want, cmds)
@@ -159,7 +159,7 @@ func TestApplyIdempotent(t *testing.T) {
 
 	// VPN aus -> Tunnel stoppen
 	_ = a.Update(func(c *config.Config) error { c.WG.VPNOff = true; return nil })
-	if cmds := fs.take(); !has(cmds, "systemctl stop wg-quick@wg0") {
+	if cmds := fs.take(); !has(cmds, "systemctl stop --no-block wg-quick@wg0") {
 		t.Errorf("Tunnel nicht gestoppt: %q", cmds)
 	}
 }
@@ -353,6 +353,44 @@ func TestLTEDownInWLANMode(t *testing.T) {
 	c.Uplink = config.UplinkLTE // Uplink LTE: nie trennen
 	a.lteFallback(c, Status{LTEUp: true, WLANUp: true}, now.Add(5*time.Minute))
 	if cmds := fs.take(); has(cmds, "down") {
+		t.Fatalf("%q", cmds)
+	}
+}
+
+// Uplink „lte“: fehlt die Verbindung (z. B. vorher vom Dienst getrennt), selbst verbinden.
+func TestLTEUpInLTEMode(t *testing.T) {
+	a, fs := newTestApp(t)
+	c := &config.Config{Uplink: config.UplinkLTE, LTE: config.LTE{Enabled: true, APN: "internet"}}
+	now := time.Now()
+	a.lteFallback(c, Status{}, now)
+	for i := 0; i < 200 && a.lteBusy.Load(); i++ {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if cmds := fs.take(); !has(cmds, "nmcli --wait 60 connection up vpndongle-lte") {
+		t.Fatalf("%q", cmds)
+	}
+	a.lteFallback(c, Status{}, now.Add(30*time.Second)) // gedrosselt
+	a.lteFallback(c, Status{LTEUp: true}, now.Add(2*time.Minute)) // steht: nichts
+	if cmds := fs.take(); len(cmds) != 0 {
+		t.Fatalf("%q", cmds)
+	}
+}
+
+// Uplink „lte“: aktives WLAN trennen (Gerät, nicht Profil); zurück auf „wlan“: Gerät wieder autoconnect.
+func TestWLANGuard(t *testing.T) {
+	a, fs := newTestApp(t)
+	lte := &config.Config{Uplink: config.UplinkLTE}
+	now := time.Now()
+	a.wlanGuard(lte, Status{WLANUp: true}, now)
+	a.wlanGuard(lte, Status{WLANUp: true}, now.Add(5*time.Second)) // gedrosselt
+	cmds := fs.take()
+	if len(cmds) != 1 || cmds[0] != "nmcli device disconnect wlan0" {
+		t.Fatalf("%q", cmds)
+	}
+	w := &config.Config{Uplink: config.UplinkWLAN}
+	a.wlanGuard(w, Status{}, now.Add(time.Minute))
+	a.wlanGuard(w, Status{}, now.Add(2*time.Minute)) // nur einmal
+	if cmds := fs.take(); len(cmds) != 1 || cmds[0] != "nmcli device set wlan0 autoconnect yes" {
 		t.Fatalf("%q", cmds)
 	}
 }

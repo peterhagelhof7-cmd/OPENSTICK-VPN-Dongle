@@ -278,42 +278,18 @@ Einstellungen (abgeleitet aus der machine-id, gleich der USB-Seriennummer).
 | Kurz kein Internet im WLAN mit mehreren Access Points | Roaming: nach dem AP-Wechsel holt der Stick per DHCP neu eine Adresse (in Gast-WLANs teils 15–30 s) |
 | Temperatur orange/rot | Belüftung; ab der Drosselgrenze taktet die CPU herunter |
 | Updates laufen nicht | Uplink LTE ohne Freigabe? Update-Protokoll prüfen |
-| Status/Anzeigen kommen nach Neustart erst nach ~2 min, Journal `FEHLER: systemctl restart wg-quick@wg0: signal: killed` | WireGuard mit Hostname als Endpoint ohne Uplink – siehe „Bekannte Einschränkung“ unten |
+| VPN „verbindet …“ ohne Uplink, `wg-quick@wg0` bleibt „activating“ | Endpoint ist ein Hostname und lässt sich ohne Internet nicht auflösen; `wg-quick` versucht es weiter (Abstand bis 20 s) und verbindet, sobald ein Uplink da ist – siehe unten |
 
-### Bekannte Einschränkung: WireGuard-Hostname ohne Uplink blockiert den Dienst
+### WireGuard-Hostname ohne Uplink (behoben in v0.3.2)
 
-Stand v0.3.2, gemessen am UZ801 (27.11.2026). Noch nicht behoben.
+Mit einem **Hostnamen** als Endpoint und **ohne Uplink** kann `wg-quick up` den Namen nicht auflösen und
+versucht es endlos weiter (Abstand wächst bis 20 s, Unit `wg-quick@wg0` „activating“). Bis v0.3.1 startete
+`vpndongled` WireGuard blockierend und stand dann bis zur 90-s-Befehlsgrenze (`signal: killed`): Start ohne
+Uplink bis zum ersten Status 125 s, Reaktionen auf Uplink-Wechsel bis 90 s verzögert.
 
-**Wann:** VPN-Art WireGuard ist eingeschaltet, der Endpoint ist ein **Hostname** (z. B.
-`gate.example.de:51821`), und der Stick hat **keinen Uplink** (kein WLAN, LTE aus oder getrennt).
-
-**Was passiert:**
-- `wg-quick up` kann den Hostnamen nicht auflösen und versucht es endlos weiter („Temporary failure in name
-  resolution … Trying again in … seconds“, Abstand wächst bis 20 s). Die Unit `wg-quick@wg0` hängt in
-  „activating“.
-- `vpndongled` startet WireGuard mit einem **blockierenden** `systemctl restart wg-quick@wg0`. Der Aufruf
-  kehrt nicht zurück, bis die Zeitgrenze für Befehle (90 s) ihn abbricht (`signal: killed`).
-- Solange steht der Dienst: keine Status-Abfrage, keine Reaktion auf Uplink-Wechsel, kein SMS-Abruf, kein
-  LTE-Rückfall. Das passiert beim Start und bei jedem Anwenden der Einstellungen, also auch bei jedem
-  Uplink-Wechsel.
-
-**Gemessen:** Neustart von `vpndongled` ohne Uplink bis zum ersten Status **125 s** (davon 90 s
-WireGuard). Eine von Hand aufgebaute LTE-Verbindung im Modus „nur WLAN“ trennte der Dienst erst nach
-~90 s statt nach ≤ 5 s.
-
-**Was nicht passiert:** Kein Datenverlust, keine Endlosschleife. Kommt ein Uplink, löst `wg-quick` den
-Namen beim nächsten Versuch auf und der Tunnel steht. Weboberfläche und SSH bleiben erreichbar.
-
-**Abhilfe bis zum Fix:**
-- Endpoint als **IP-Adresse** eintragen (dann gibt es keine Namensauflösung), oder
-- VPN ausschalten, solange der Stick ohne Uplink betrieben wird.
-
-**Geplanter Fix:** WireGuard nicht blockierend starten (`systemctl restart --no-block`) und den Zustand
-über den Handshake prüfen, wie bisher für die Anzeige.
-
-**Kein Zugang mehr:** Der UZ801 hat keine Taste für fastboot/EDL. Dann Gehäuse öffnen, den
-EDL-Testpunkt gegen Masse halten und einstecken (`05C6:9008`). Im EDL-Modus lässt sich jede Partition aus
-dem Backup zurückschreiben (`edl w <partition> <backup>\<partition>.bin`) oder das Image neu flashen.
+Seit v0.3.2 startet und stoppt der Dienst WireGuard ohne zu warten (`--no-block`). Gemessen am UZ801
+(27.11.2026): Start ohne Uplink bis zum ersten Status 36 s; nach Umschalten auf LTE Handshake nach 6 s.
+Ob der Tunnel steht, zeigt wie bisher der Handshake.
 
 ## 10. Sicherheit
 

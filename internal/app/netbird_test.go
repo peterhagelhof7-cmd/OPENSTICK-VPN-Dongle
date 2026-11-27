@@ -56,7 +56,7 @@ func TestNetBirdLoginClearsKey(t *testing.T) {
 	if k := a.Store.Get().NetBird.SetupKey; k != "" {
 		t.Fatalf("Setup-Key nach erfolgreicher Anmeldung noch gespeichert: %q", k)
 	}
-	if !has(cmds, "systemctl stop wg-quick") && has(cmds, "systemctl restart wg-quick") {
+	if !has(cmds, "systemctl stop --no-block wg-quick") && has(cmds, "systemctl restart --no-block wg-quick") {
 		t.Fatal("WireGuard darf neben NetBird nicht laufen")
 	}
 

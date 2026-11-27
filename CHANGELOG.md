@@ -7,8 +7,13 @@
   sie jetzt; das Modem bleibt eingebucht, SMS kommen weiter an
 - Hängt eine schon gespeicherte SMS im Modem (Löschen scheitert), steht das nur noch einmal im Journal statt
   alle 15 s
-- Dokumentiert (admin-guide §9): WireGuard mit Hostname als Endpoint blockiert ohne Uplink den Dienst bis
-  90 s je Anwenden der Einstellungen (Start ~2 min bis zum ersten Status) – noch nicht behoben
+- **WireGuard blockierte ohne Uplink den Dienst:** Mit einem Hostnamen als Endpoint versucht `wg-quick` die
+  Namensauflösung endlos; der Dienst wartete darauf bis zur 90-s-Befehlsgrenze (Start bis zum ersten Status
+  125 s, Reaktionen bis 90 s verzögert). WireGuard startet und stoppt jetzt ohne zu warten – Start 36 s
+- **Uplink „nur LTE“:** Eine noch aktive WLAN-Verbindung wird getrennt (ihre Default-Route schlug LTE; bei
+  kaputtem WLAN gingen DNS und Tunnel ins Leere), und eine vorher vom Dienst getrennte LTE-Verbindung baut
+  der Stick selbst wieder auf (NetworkManager verbindet „vom Benutzer getrennte“ Profile nicht mehr von
+  selbst). Zurück auf „WLAN“/„Auto“ ist WLAN-Autoconnect wieder an
 
 ## v0.3.1
 

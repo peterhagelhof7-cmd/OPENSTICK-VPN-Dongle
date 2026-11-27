@@ -162,6 +162,8 @@ type App struct {
 	wlanDownSince, wlanUpSince time.Time
 	lteLastTry                 time.Time
 	lteBusy                    atomic.Bool
+	wlanLastDown               time.Time // wlanGuard (nur aus tick)
+	wlanAutoOn                 bool      // Gerät wlan0 autoconnect=yes gesetzt
 
 	// Modem-Pflege (modem.go): PIN1 entsperren, Einbuchungs-Profil abgleichen
 	modemBusy     atomic.Bool
@@ -298,14 +300,19 @@ func (a *App) Apply() error {
 			if err := a.Sys.WriteFile(WGConf, []byte(conf), 0o600); err != nil {
 				errs = append(errs, err)
 				a.forget("wg")
-			} else if _, err := a.Sys.Run("systemctl", "restart", WGUnit); err != nil {
+			} else if _, err := a.Sys.Run("systemctl", "restart", "--no-block", WGUnit); err != nil {
+				// --no-block: Mit einem Hostnamen als Endpoint und ohne Uplink versucht
+				// wg-quick die Namensauflösung endlos; ein blockierendes restart hielt den
+				// Dienst bis zur 90-s-Befehlsgrenze an (Start bis zum ersten Status 125 s,
+				// 27.11.2026). Ob der Tunnel steht, zeigt ohnehin der Handshake.
 				errs = append(errs, err)
 				a.forget("wg")
 			}
 		}
 	}
 	if !want && (a.wgOn == nil || *a.wgOn) {
-		if _, err := a.Sys.Run("systemctl", "stop", WGUnit); err != nil {
+		// auch hier nicht warten: ein noch hängender Start wird damit abgebrochen
+		if _, err := a.Sys.Run("systemctl", "stop", "--no-block", WGUnit); err != nil {
 			errs = append(errs, err)
 		}
 		a.forget("wg")
@@ -565,6 +572,7 @@ func (a *App) tick() {
 	}
 
 	a.modemCare(c, ns.LTE, now)
+	a.wlanGuard(c, ns, now)
 	a.lteFallback(c, ns, now)
 	a.updateLED(ns)
 	if SMSActive(c) {
@@ -599,6 +607,16 @@ func (a *App) lteFallback(c *config.Config, s Status, now time.Time) {
 		}
 		return
 	}
+	// Modus "lte": Hat der Dienst LTE vorher getrennt (Modus „wlan“/„auto“), verbindet
+	// NetworkManager das Profil nicht mehr von selbst („vom Benutzer getrennt“, bis zum
+	// Neustart) – nach dem Umschalten auf „lte“ blieb der Stick ohne Uplink (27.11.2026).
+	if c.Uplink == config.UplinkLTE {
+		if c.LTE.Enabled && c.LTE.APN != "" && !s.LTEUp && !a.lteBusy.Load() && now.Sub(a.lteLastTry) >= lteRetryEvery {
+			a.lteLastTry = now
+			a.lteAsync("up")
+		}
+		return
+	}
 	if c.Uplink != config.UplinkAuto || !c.LTE.Enabled || c.LTE.APN == "" {
 		return
 	}
@@ -622,6 +640,33 @@ func (a *App) lteFallback(c *config.Config, s Status, now time.Time) {
 		a.lteAsync("up")
 	case s.WLANUp && s.LTEUp && now.Sub(a.wlanUpSince) >= lteDownAfter:
 		a.lteAsync("down")
+	}
+}
+
+// wlanGuard: Modus "lte" heißt „WLAN nicht“. Eine noch aktive WLAN-Verbindung aus dem Modus
+// „wlan“ blieb sonst stehen (autoconnect=false verhindert nur neue), ihre Default-Route
+// (Metrik 100) schlug LTE (700) – bei einem kaputten WLAN gingen DNS und Tunnel ins Leere
+// (27.11.2026). Getrennt wird das Gerät, nicht das Profil: Ein „connection down“ sperrt das
+// Profil bis zum Neustart für Autoconnect. Die Gerätesperre hebt der Modus „wlan“/„auto“
+// wieder auf.
+func (a *App) wlanGuard(c *config.Config, s Status, now time.Time) {
+	if c.Uplink == config.UplinkLTE {
+		a.wlanAutoOn = false
+		if s.WLANUp && now.Sub(a.wlanLastDown) >= lteRetryEvery {
+			a.wlanLastDown = now
+			log.Printf("Uplink LTE: trenne WLAN")
+			if _, err := a.Sys.Run("nmcli", "device", "disconnect", a.Net.WLANIface); err != nil {
+				a.setErr(err)
+			}
+		}
+		return
+	}
+	if !a.wlanAutoOn {
+		if _, err := a.Sys.Run("nmcli", "device", "set", a.Net.WLANIface, "autoconnect", "yes"); err != nil {
+			a.setErr(err)
+			return
+		}
+		a.wlanAutoOn = true
 	}
 }
 
