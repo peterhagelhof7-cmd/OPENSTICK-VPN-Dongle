@@ -1,6 +1,6 @@
 # Änderungen
 
-## v0.3.2 (unveröffentlicht)
+## v0.3.2
 
 - **Uplink „nur WLAN“ trennt LTE:** Nach dem Umschalten von „LTE“ auf „WLAN“ lief eine bestehende
   LTE-Verbindung weiter (nur das automatische Verbinden war aus) und verbrauchte Volumen. Der Stick trennt
