@@ -333,3 +333,26 @@ func waitFor(t *testing.T, f func() bool) {
 	}
 	t.Fatal("Zeitüberschreitung")
 }
+
+// Uplink „wlan“: eine noch laufende LTE-Verbindung wird getrennt, gedrosselt.
+func TestLTEDownInWLANMode(t *testing.T) {
+	a, fs := newTestApp(t)
+	c := &config.Config{Uplink: config.UplinkWLAN, LTE: config.LTE{Enabled: true, APN: "internet"}}
+	now := time.Now()
+	a.lteFallback(c, Status{LTEUp: true}, now)
+	for i := 0; i < 200 && a.lteBusy.Load(); i++ {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if cmds := fs.take(); !has(cmds, "nmcli --wait 60 connection down vpndongle-lte") {
+		t.Fatalf("%q", cmds)
+	}
+	a.lteFallback(c, Status{LTEUp: true}, now.Add(10*time.Second)) // gedrosselt
+	if cmds := fs.take(); len(cmds) != 0 {
+		t.Fatalf("zu oft: %q", cmds)
+	}
+	c.Uplink = config.UplinkLTE // Uplink LTE: nie trennen
+	a.lteFallback(c, Status{LTEUp: true, WLANUp: true}, now.Add(5*time.Minute))
+	if cmds := fs.take(); has(cmds, "down") {
+		t.Fatalf("%q", cmds)
+	}
+}

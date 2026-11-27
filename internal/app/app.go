@@ -187,6 +187,7 @@ type App struct {
 	smsSent      []time.Time
 	smsLastPoll  time.Time
 	smsEnableTry time.Time
+	smsDelFailed map[string]bool // Modem-SMS, deren Löschen schon scheiterte (nur aus tick)
 
 	// LTE-Verbrauch (usage.go, nur aus tick) und externe IP
 	usage         usageState
@@ -202,7 +203,7 @@ type App struct {
 func New(store *config.Store, sys system.Sys, version string) *App {
 	return &App{
 		Store: store, Sys: sys, Net: render.DefaultNet(), Version: version,
-		hashes: map[string][32]byte{}, leds: led.Find(sys), startedAt: time.Now(), sleep: time.Sleep, extFetch: fetchExtIP,
+		hashes: map[string][32]byte{}, leds: led.Find(sys), startedAt: time.Now(), sleep: time.Sleep, extFetch: fetchExtIP, smsDelFailed: map[string]bool{},
 		status: Status{CfgAvail: -1, HandshakeAge: -1, Version: version, CPUPct: -1, RAMPct: -1, CPUTemp: -1, ModemTemp: -1},
 	}
 }
@@ -586,8 +587,18 @@ func (a *App) tick() {
 	}
 }
 
-// lteFallback: Modus "auto" – LTE nur, wenn WLAN fehlt.
+// lteFallback: Modus "auto" – LTE nur, wenn WLAN fehlt. Modus "wlan": eine noch laufende
+// LTE-Verbindung trennen (autoconnect=false verhindert nur neue; nach dem Umschalten von
+// „lte“ auf „wlan“ lief sie weiter und verbrauchte Volumen, 27.11.2026). Das Modem bleibt
+// eingebucht, SMS kommen weiter an.
 func (a *App) lteFallback(c *config.Config, s Status, now time.Time) {
+	if c.Uplink == config.UplinkWLAN {
+		if s.LTEUp && !a.lteBusy.Load() && now.Sub(a.lteLastTry) >= lteRetryEvery {
+			a.lteLastTry = now
+			a.lteAsync("down")
+		}
+		return
+	}
 	if c.Uplink != config.UplinkAuto || !c.LTE.Enabled || c.LTE.APN == "" {
 		return
 	}

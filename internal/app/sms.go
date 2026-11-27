@@ -175,12 +175,21 @@ func (a *App) smsPoll(s Status, now time.Time) {
 	}
 	for _, p := range paths {
 		if _, err := a.Sys.Run("mmcli", "-m", "any", "--messaging-delete-sms="+p); err != nil {
-			log.Printf("SMS im Modem löschen: %v", err)
+			// Bleibt eine SMS im Modem hängen, kommt sie alle 15 s wieder: nur einmal melden.
+			if !a.smsDelFailed[p] {
+				log.Printf("SMS im Modem löschen: %v", err)
+			}
+			a.smsDelFailed[p] = true
+		} else {
+			delete(a.smsDelFailed, p)
 		}
 	}
-	if dup := len(got) - added; dup > 0 {
+	switch dup := len(got) - added; {
+	case added == 0:
+		// nur schon bekannte (im Modem hängengeblieben) – kein Eintrag alle 15 s
+	case dup > 0:
 		log.Printf("SMS: %d neue empfangen, %d schon in der Ablage", added, dup)
-	} else {
+	default:
 		log.Printf("SMS: %d neue empfangen", added)
 	}
 }

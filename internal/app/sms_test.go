@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"log"
 	"os"
 	"strings"
 	"testing"
@@ -244,5 +245,27 @@ func TestSMSSendRetry(t *testing.T) {
 	}
 	if n != 1 {
 		t.Fatalf("%d Anlegeversuche", n)
+	}
+}
+
+// Hängt eine schon gespeicherte SMS im Modem, wird nicht alle 15 s geloggt.
+func TestSMSPollQuietForStuck(t *testing.T) {
+	a, fs := smsApp(t)
+	var buf strings.Builder
+	log.SetOutput(&buf)
+	defer log.SetOutput(os.Stderr)
+	fs.out["mmcli -m any --messaging-list-sms"] = `{"modem.messaging.sms":["` + smsPath + `7"]}`
+	fs.out["mmcli -s "+smsPath+"7"] = smsJSON("received", "deliver", "hängt")
+	fs.fail["mmcli -m any --messaging-delete-sms="] = errors.New("Couldn't delete 1 parts from this SMS")
+	now := time.Now()
+	for i := 0; i < 4; i++ {
+		a.smsPoll(a.Status(), now.Add(time.Duration(i)*smsPollEvery))
+	}
+	out := buf.String()
+	if strings.Count(out, "1 neue empfangen") != 1 || strings.Count(out, "löschen") != 1 || strings.Contains(out, "0 neue") {
+		t.Fatalf("Log:\n%s", out)
+	}
+	if l := a.SMSMessages(); len(l) != 1 {
+		t.Fatalf("%d Einträge", len(l))
 	}
 }

@@ -1,5 +1,13 @@
 # Änderungen
 
+## v0.3.2 (unveröffentlicht)
+
+- **Uplink „nur WLAN“ trennt LTE:** Nach dem Umschalten von „LTE“ auf „WLAN“ lief eine bestehende
+  LTE-Verbindung weiter (nur das automatische Verbinden war aus) und verbrauchte Volumen. Der Stick trennt
+  sie jetzt; das Modem bleibt eingebucht, SMS kommen weiter an
+- Hängt eine schon gespeicherte SMS im Modem (Löschen scheitert), steht das nur noch einmal im Journal statt
+  alle 15 s
+
 ## v0.3.1
 
 Aus dem ersten Test mit SIM (UZ801, PremiumSIM im Vodafone-Netz):
