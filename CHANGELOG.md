@@ -7,6 +7,8 @@
   sie jetzt; das Modem bleibt eingebucht, SMS kommen weiter an
 - Hängt eine schon gespeicherte SMS im Modem (Löschen scheitert), steht das nur noch einmal im Journal statt
   alle 15 s
+- Dokumentiert (admin-guide §9): WireGuard mit Hostname als Endpoint blockiert ohne Uplink den Dienst bis
+  90 s je Anwenden der Einstellungen (Start ~2 min bis zum ersten Status) – noch nicht behoben
 
 ## v0.3.1
 

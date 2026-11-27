@@ -278,6 +278,38 @@ Einstellungen (abgeleitet aus der machine-id, gleich der USB-Seriennummer).
 | Kurz kein Internet im WLAN mit mehreren Access Points | Roaming: nach dem AP-Wechsel holt der Stick per DHCP neu eine Adresse (in Gast-WLANs teils 15–30 s) |
 | Temperatur orange/rot | Belüftung; ab der Drosselgrenze taktet die CPU herunter |
 | Updates laufen nicht | Uplink LTE ohne Freigabe? Update-Protokoll prüfen |
+| Status/Anzeigen kommen nach Neustart erst nach ~2 min, Journal `FEHLER: systemctl restart wg-quick@wg0: signal: killed` | WireGuard mit Hostname als Endpoint ohne Uplink – siehe „Bekannte Einschränkung“ unten |
+
+### Bekannte Einschränkung: WireGuard-Hostname ohne Uplink blockiert den Dienst
+
+Stand v0.3.2, gemessen am UZ801 (27.11.2026). Noch nicht behoben.
+
+**Wann:** VPN-Art WireGuard ist eingeschaltet, der Endpoint ist ein **Hostname** (z. B.
+`gate.example.de:51821`), und der Stick hat **keinen Uplink** (kein WLAN, LTE aus oder getrennt).
+
+**Was passiert:**
+- `wg-quick up` kann den Hostnamen nicht auflösen und versucht es endlos weiter („Temporary failure in name
+  resolution … Trying again in … seconds“, Abstand wächst bis 20 s). Die Unit `wg-quick@wg0` hängt in
+  „activating“.
+- `vpndongled` startet WireGuard mit einem **blockierenden** `systemctl restart wg-quick@wg0`. Der Aufruf
+  kehrt nicht zurück, bis die Zeitgrenze für Befehle (90 s) ihn abbricht (`signal: killed`).
+- Solange steht der Dienst: keine Status-Abfrage, keine Reaktion auf Uplink-Wechsel, kein SMS-Abruf, kein
+  LTE-Rückfall. Das passiert beim Start und bei jedem Anwenden der Einstellungen, also auch bei jedem
+  Uplink-Wechsel.
+
+**Gemessen:** Neustart von `vpndongled` ohne Uplink bis zum ersten Status **125 s** (davon 90 s
+WireGuard). Eine von Hand aufgebaute LTE-Verbindung im Modus „nur WLAN“ trennte der Dienst erst nach
+~90 s statt nach ≤ 5 s.
+
+**Was nicht passiert:** Kein Datenverlust, keine Endlosschleife. Kommt ein Uplink, löst `wg-quick` den
+Namen beim nächsten Versuch auf und der Tunnel steht. Weboberfläche und SSH bleiben erreichbar.
+
+**Abhilfe bis zum Fix:**
+- Endpoint als **IP-Adresse** eintragen (dann gibt es keine Namensauflösung), oder
+- VPN ausschalten, solange der Stick ohne Uplink betrieben wird.
+
+**Geplanter Fix:** WireGuard nicht blockierend starten (`systemctl restart --no-block`) und den Zustand
+über den Handshake prüfen, wie bisher für die Anzeige.
 
 **Kein Zugang mehr:** Der UZ801 hat keine Taste für fastboot/EDL. Dann Gehäuse öffnen, den
 EDL-Testpunkt gegen Masse halten und einstecken (`05C6:9008`). Im EDL-Modus lässt sich jede Partition aus
